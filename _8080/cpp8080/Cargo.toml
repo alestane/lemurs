@@ -1,0 +1,17 @@
+[package]
+name = "cpp8080"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+_8080 = { path = "..", default-features = false }
+cpp_panic = { workspace = true, optional = true }
+cpp_alloc = { workspace = true, optional = true }
+
+[features]
+default = ["dep:cpp_panic", "dep:cpp_alloc"]
