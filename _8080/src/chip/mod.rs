@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::{*, boxed::Box, vec, vec::Vec};
+use crate::{boxed::Box, vec, vec::Vec};
 
 pub struct State {
 	ram: Vec<u8>,
@@ -23,7 +23,6 @@ pub enum Zone {
 	In, 
 	Out,
 	RAM,
-	VRam,
 }
 
 impl State {
@@ -50,17 +49,25 @@ impl State {
 			memory: length
 		})
 	}
-	pub fn vram(&self) -> &[u8;VRAM_SIZE] {
-		self.ram.rsplit_array_ref().1
-	}
 }
 
 impl State {
 	pub fn execute(&mut self) -> u8 {
-		for (i, v) in self.ram.iter().take(self.port_out.len()).enumerate() {
-			self.port_out[i] = *v;
+		let mut cycles = 0u8;
+		let mut ram_pos = 255usize;
+		let mut port_idx = 0usize;
+		loop {
+			let (ram_val, in_value) = (self.ram[ram_pos], self.port_in[port_idx]);
+			(self.port_out[255 - ram_pos], self.ram[ram_pos]) = (ram_val, in_value);
+			let progress = 
+				(if ram_val != 0 { ram_pos -= 1; true } else { false }) ||
+				(if in_value != 0 { port_idx += 1; true } else { false });
+			if progress > 0 {
+				cycles += 1;
+			} else {
+				break cycles;
+			}
 		}
-		1
 	}
 }
 
@@ -81,7 +88,6 @@ impl Index<Zone> for State {
 			Zone::In => &self.port_in[..],
 			Zone::Out => &self.port_out[..],
 			Zone::RAM => &self.ram[..],
-			Zone::VRam => &self.ram[VRAM_ADDRESS..],
 		}
 	}
 }
@@ -92,7 +98,6 @@ impl IndexMut<Zone> for State {
 			Zone::In => &mut self.port_in[..],
 			Zone::Out => &mut self.port_out[..0],
 			Zone::RAM => &mut self.ram[..0],
-			Zone::VRam => &mut self.ram[VRAM_ADDRESS..VRAM_ADDRESS],
 		}		
 	}
 }

@@ -1,6 +1,6 @@
 #![no_std]
 
-use _8080::{State, Box, Zone};
+use _8080::{State, Box};
 
 use core::convert::TryFrom;
 
@@ -35,6 +35,6 @@ pub unsafe extern "C" fn state_ram(state: *const State) -> *const u8 {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn state_vram(state: *const State) -> *const u8 {
-    &(*state)[Zone::VRam][0] as *const u8
+pub unsafe extern "C" fn state_execute(state: *mut State) -> u8 {
+    state.execute()
 }

@@ -14,9 +14,6 @@ mod foundation {
 use foundation::*;
 pub use boxed::Box;
 
-pub const VRAM_ADDRESS: usize = 9216;
-pub const VRAM_SIZE: usize = 7168;
-
 mod chip;
 
 pub use chip::{State, Zone};

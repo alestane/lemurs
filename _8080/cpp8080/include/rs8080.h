@@ -7,14 +7,10 @@
 #include <memory>
 #include <vector>
 
-extern "C" {
-	void discard_state(void*);
-}
-
 namespace i8080 {
 	class state {
 	public:
-		struct deleter { void operator() (state* it); };
+		struct deleter { void operator() (state* it) const; };
 
 		using byte = uint8_t;
 		using word = uint16_t;
@@ -25,7 +21,12 @@ namespace i8080 {
 		static owner create(word size, buffer&& source);
 		static owner create(const std::vector<byte>& source);
 
+		std::array<byte, 256>& ports_in();
+		const std::array<byte, 256>& ports_out() const;
+		const byte (&ram() const)[]; // const method returns reference to const byte array of unknown size
 		const std::array<byte, 7168>& get_vram() const;
+
+		uint8_t execute();
 	private:
 		unsigned char : 0;
 	};
