@@ -12,7 +12,7 @@ pub struct State {
 	memory: u16,
 }
 
-use core::{convert::TryFrom, ops::{Index, Deref}};
+use core::{convert::TryFrom, ops::{Index, IndexMut, Deref}};
 
 pub enum Byte {
 	In(u8),
@@ -83,6 +83,17 @@ impl Index<Zone> for State {
 			Zone::RAM => &self.ram[..],
 			Zone::VRam => &self.ram[VRAM_ADDRESS..],
 		}
+	}
+}
+
+impl IndexMut<Zone> for State {
+	fn index_mut(&mut self, z: Zone) -> &mut Self::Output {
+		match z {
+			Zone::In => &mut self.port_in[..],
+			Zone::Out => &mut self.port_out[..0],
+			Zone::RAM => &mut self.ram[..0],
+			Zone::VRam => &mut self.ram[VRAM_ADDRESS..VRAM_ADDRESS],
+		}		
 	}
 }
 
