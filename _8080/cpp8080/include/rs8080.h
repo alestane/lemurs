@@ -14,7 +14,7 @@ extern "C" {
 namespace i8080 {
 	class state {
 	public:
-		struct deleter { void operator() (state* it) { discard_state(it); } };
+		struct deleter { void operator() (state* it); };
 
 		using byte = uint8_t;
 		using word = uint16_t;

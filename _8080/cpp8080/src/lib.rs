@@ -25,6 +25,16 @@ pub unsafe extern "C" fn state_outputs(state: *const State) -> *const u8 {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn state_inputs(state: *mut State) -> *mut u8 {
+    &mut (*state)[Zone::In][0] as *mut u8
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn state_ram(state: *const State) -> *const u8 {
+    &(*state)[Zone::RAM][0] as *const u8
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn state_vram(state: *const State) -> *const u8 {
-    &(*state).as_ref()[9216usize] as *const u8
+    &(*state)[Zone::VRam][0] as *const u8
 }
