@@ -9,9 +9,12 @@ edition = "2021"
 crate-type = ["staticlib"]
 
 [dependencies]
-_8080 = { path = "..", default-features = false }
 cpp_panic = { workspace = true, optional = true }
 cpp_alloc = { workspace = true, optional = true }
+_8080 = { path = "..", default-features = false }
 
 [features]
 default = ["dep:cpp_panic", "dep:cpp_alloc"]
+
+[build-dependencies]
+cc = ">= 1.0.0"

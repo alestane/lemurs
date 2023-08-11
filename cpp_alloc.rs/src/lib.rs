@@ -1,7 +1,5 @@
 #![cfg_attr(not(test), no_std)]
 
-extern crate cpp_panic;
-
 use core::alloc::{GlobalAlloc, Layout};
 
 extern {

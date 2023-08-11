@@ -1,8 +1,10 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(lang_items)]
 
+#[cfg(not(test))]
 use core::panic::PanicInfo;
 
+#[cfg(not(test))]
 extern "C-unwind" {
 	fn bail() -> !;
 }

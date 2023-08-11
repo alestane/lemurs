@@ -4,10 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["staticlib"]
+crate-type = ["rlib"]
 
-[dependencies]
-cpp_panic = { path = "../cpp_panic.rs"}
 
 [build-dependencies]
 cc  = ">= 1.0.0"

@@ -1,4 +1,4 @@
-extern crate rust_8080;
+extern crate _8080;
 
 fn main() {
 	println!("17!");
