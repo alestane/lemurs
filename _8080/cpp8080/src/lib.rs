@@ -1,8 +1,11 @@
 #![no_std]
 
-use _8080::{State, Box};
+extern crate cpp_panic;
+extern crate cpp_alloc;
 
-use core::convert::TryFrom;
+use _8080::{State, Box, Zone};
+
+use core::{convert::TryFrom, mem::transmute};
 
 #[no_mangle]
 pub unsafe extern "C" fn new_empty_state(memory: usize) -> *mut State {
@@ -21,20 +24,31 @@ pub unsafe extern "C" fn discard_state(state: *mut State) {
 
 #[no_mangle]
 pub unsafe extern "C" fn state_outputs(state: *const State) -> *const u8 {
-    &(*state)[Zone::Out][0] as *const u8
+    transmute(
+        state.as_ref()
+            .map(|state| &state[Zone::Out][0])
+    )
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn state_inputs(state: *mut State) -> *mut u8 {
-    &mut (*state)[Zone::In][0] as *mut u8
+    transmute(
+        state.as_mut()
+            .map(|state|&mut state[Zone::In][0])
+    )
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn state_ram(state: *const State) -> *const u8 {
-    &(*state)[Zone::RAM][0] as *const u8
+    transmute(
+        state.as_ref()
+            .map(|state| &state[Zone::RAM][0])
+    )
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn state_execute(state: *mut State) -> u8 {
-    state.execute()
+pub unsafe extern "C-unwind" fn state_execute(state: *mut State) -> u8 {
+    state.as_mut()
+    .expect("null or invalid state pointer")
+    .execute()
 }
