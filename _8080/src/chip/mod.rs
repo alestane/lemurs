@@ -62,7 +62,7 @@ impl State {
 			let progress = 
 				(if ram_val != 0 { ram_pos -= 1; true } else { false }) ||
 				(if in_value != 0 { port_idx += 1; true } else { false });
-			if progress > 0 {
+			if progress {
 				cycles += 1;
 			} else {
 				break cycles;
