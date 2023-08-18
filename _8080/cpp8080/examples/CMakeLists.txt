@@ -15,6 +15,7 @@ link_directories(../../../target/${BUILD_TYPE_PATH})
 link_libraries(cpp8080.lib)
 
 add_executable(poc poc.cpp)
+add_executable(diag cpudiag.cpp)
 
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
