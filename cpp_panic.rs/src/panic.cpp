@@ -3,7 +3,7 @@
 
 extern "C" {
 	[[noreturn]]
-	int bail() {
-		throw std::runtime_error{"Error in Rust library"};
+	int bail(const char* err_text) {
+		throw std::runtime_error{err_text};
 	}
 }
