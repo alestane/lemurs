@@ -1,2 +1,5 @@
 [Tt][Aa][Rr][Gg][Ee][Tt]/*
 *.lock
+
+.vscode/
+build/
