@@ -11,6 +11,10 @@ extern "C" {
 	byte* state_inputs(state* self);
 	const byte* state_ram(const state* self);
 
+#ifdef DEBUG
+	void state_register_debug(state* self, state::debugger);
+#endif
+
 	uint8_t state_execute(state* self);
 }
 
@@ -34,6 +38,12 @@ namespace i8080 {
 	const byte (&state::ram() const)[] {
 		return *reinterpret_cast<const byte (*)[]>(state_ram(this));
 	}
+
+#ifdef DEBUG
+	void state::add_listener(state::debugger listener) {
+		state_add_debugger(this, listener);
+	}
+#endif
 	
 	uint8_t state::execute() {
 		return state_execute(this);

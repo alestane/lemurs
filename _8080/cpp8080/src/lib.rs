@@ -5,7 +5,7 @@ extern crate cpp_alloc;
 
 use _8080::{State, Box, Zone};
 
-use core::{convert::TryFrom, mem::transmute};
+use core::{array, convert::TryFrom};
 
 #[no_mangle]
 pub unsafe extern "C" fn new_empty_state(memory: usize) -> *mut State {
@@ -23,27 +23,29 @@ pub unsafe extern "C" fn discard_state(state: *mut State) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn state_outputs(state: *const State) -> *const u8 {
-    transmute(
-        state.as_ref()
-            .map(|state| &state[Zone::Out][0])
-    )
+pub unsafe extern "C" fn state_outputs(state: *const State) -> Option<&'static [u8;1]> {
+    state.as_ref()
+        .map(|state| array::from_ref(&state[Zone::Out][0]))
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn state_inputs(state: *mut State) -> *mut u8 {
-    transmute(
-        state.as_mut()
-            .map(|state|&mut state[Zone::In][0])
-    )
+pub unsafe extern "C" fn state_inputs(state: *mut State) -> Option<&'static mut [u8;1]> {
+    state.as_mut()
+        .map(|state|array::from_mut(&mut state[Zone::In][0]))
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn state_ram(state: *const State) -> *const u8 {
-    transmute(
-        state.as_ref()
-            .map(|state| &state[Zone::RAM][0])
-    )
+pub unsafe extern "C" fn state_ram(state: *const State) -> Option<&'static [u8;1]> {
+    state.as_ref()
+        .map(|state| array::from_ref(&state[Zone::RAM][0]))
+}
+
+#[cfg(debug_assertions)]
+#[no_mangle]
+pub unsafe extern "C" fn state_register_debug(state: *mut State, op: extern "C" fn(&'static [u8;1], u16, u16, u8) -> bool) {
+    if let Some(state) = state.as_mut() {
+        state.register(op)
+    };
 }
 
 #[no_mangle]

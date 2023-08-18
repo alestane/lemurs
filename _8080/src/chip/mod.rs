@@ -2,6 +2,9 @@
 
 use crate::{boxed::Box, vec, vec::Vec};
 
+pub(self) mod access;
+mod execution;
+
 pub struct State {
 	ram: Vec<u8>,
 	port_in: [u8;256],
@@ -9,21 +12,16 @@ pub struct State {
 	register: [u8;7],
 	c: bool, a: bool, p: bool, m: bool, z: bool,
 	active: bool, interrupts: bool,
+	pc: u16,
+	sp: u16,
 	memory: u16,
+	#[cfg(debug_assertions)]
+	callbacks: Vec<unsafe extern "C" fn(&'static [u8;1], u16, u16, u8) -> bool>,
 }
 
-use core::{convert::TryFrom, ops::{Index, IndexMut, Deref}};
+use core::{convert::TryFrom, ops::Deref};
 
-pub enum Byte {
-	In(u8),
-	Out(u8),
-}
-
-pub enum Zone {
-	In, 
-	Out,
-	RAM,
-}
+pub use access::{Byte, Zone};
 
 impl State {
 	pub fn new_with_ram(memory: u16) -> Box<Self> {
@@ -32,9 +30,11 @@ impl State {
 			port_in: [0;256], 
 			port_out: [0;256], 
 			register: [0;7], 
-			c: false, a: false, p: false, m: false, z: false, 
+			c: false, p: false, a: false, z: false, m: false, 
 			active: true, interrupts: false, 
-			memory: memory
+			pc: 0, sp: 0,
+			memory: memory,
+			#[cfg(debug_assertions)] callbacks: Vec::new(),
 		})
 	}
 	pub fn new_with_rom(memory: &[u8]) -> Box<Self> {
@@ -46,61 +46,23 @@ impl State {
 			register: [0;7], 
 			c: false, a: false, p: false, m: false, z: false, 
 			active: true, interrupts: false, 
-			memory: length
+			pc: 0, sp: 0,
+			memory: length,
+			#[cfg(debug_assertions)] callbacks: Vec::new(),
 		})
+	}
+}
+
+#[cfg(debug_assertions)]
+impl State {
+	pub fn add_callback(&mut self, op: extern "C" fn (&'static [u8;1], u16, u16, u8) -> bool) {
+		self.callbacks.push(op);
 	}
 }
 
 impl State {
 	pub fn execute(&mut self) -> u8 {
-		let mut n = 0u8;
-		self.port_out.iter_mut().zip(
-			self.ram.iter().rev().copied()
-		)
-			.inspect(|&(_, s)| if s != 0 { n += 1; })
-			.for_each(|(d, s)| *d = s);
-		n.max( 
-			{
-				let mut n = 0;
-				self.ram.iter_mut().rev().zip(
-					self.port_in.iter().copied()
-				)
-					.inspect(|&(_, s)| if s != 0 { n += 1; })
-					.for_each(|(d, s)| *d = s);
-				n
-			}
-		)
-	}
-}
-
-impl Index<Byte> for State {
-	type Output = u8;
-	fn index(&self, i: Byte) -> &Self::Output {
-		match i {
-			Byte::In(port) => &self.port_in[port as usize],
-			Byte::Out(port) => &self.port_out[port as usize],
-		}
-	}
-}
-
-impl Index<Zone> for State {
-	type Output = [u8];
-	fn index(&self, z: Zone) -> &Self::Output {
-		match z {
-			Zone::In => &self.port_in[..],
-			Zone::Out => &self.port_out[..],
-			Zone::RAM => &self.ram[..],
-		}
-	}
-}
-
-impl IndexMut<Zone> for State {
-	fn index_mut(&mut self, z: Zone) -> &mut Self::Output {
-		match z {
-			Zone::In => &mut self.port_in[..],
-			Zone::Out => &mut self.port_out[..0],
-			Zone::RAM => &mut self.ram[..0],
-		}		
+		0
 	}
 }
 

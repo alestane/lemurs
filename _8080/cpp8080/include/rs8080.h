@@ -24,7 +24,12 @@ namespace i8080 {
 		std::array<byte, 256>& ports_in();
 		const std::array<byte, 256>& ports_out() const;
 		const byte (&ram() const)[]; // const method returns reference to const byte array of unknown size
-		const std::array<byte, 7168>& get_vram() const;
+//		const std::array<byte, 7168>& get_vram() const;
+
+#ifdef DEBUG
+		using debugger = bool (*)(uint8_t (&)[], uint16_t, uint16_t, uint8_t);
+		void add_listener(debugger op);
+#endif
 
 		uint8_t execute();
 	private:
