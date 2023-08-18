@@ -53,21 +53,23 @@ impl State {
 
 impl State {
 	pub fn execute(&mut self) -> u8 {
-		let mut cycles = 0u8;
-		let mut ram_pos = 255usize;
-		let mut port_idx = 0usize;
-		loop {
-			let (ram_val, in_value) = (self.ram[ram_pos], self.port_in[port_idx]);
-			(self.port_out[255 - ram_pos], self.ram[ram_pos]) = (ram_val, in_value);
-			let progress = 
-				(if ram_val != 0 { ram_pos -= 1; true } else { false }) ||
-				(if in_value != 0 { port_idx += 1; true } else { false });
-			if progress {
-				cycles += 1;
-			} else {
-				break cycles;
+		let mut n = 0u8;
+		self.port_out.iter_mut().zip(
+			self.ram.iter().rev().copied()
+		)
+			.inspect(|&(_, s)| if s != 0 { n += 1; })
+			.for_each(|(d, s)| *d = s);
+		n.max( 
+			{
+				let mut n = 0;
+				self.ram.iter_mut().rev().zip(
+					self.port_in.iter().copied()
+				)
+					.inspect(|&(_, s)| if s != 0 { n += 1; })
+					.for_each(|(d, s)| *d = s);
+				n
 			}
-		}
+		)
 	}
 }
 
