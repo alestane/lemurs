@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(split_array)]
+#![feature(exclusive_range_pattern)]
 
 #[cfg(feature="std")]
 mod foundation {

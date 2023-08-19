@@ -9,6 +9,7 @@ impl Deref for State {
 	}
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum Byte {
 	B,
 	C,
@@ -23,6 +24,7 @@ pub enum Byte {
 	Out(u8),
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum Word {
     BC,
     DE,
@@ -107,8 +109,8 @@ impl ShlAssign<(Word, u16)> for State {
             }
             SP => self.sp = val,
             RAM(i) => *self <<= (i, val),
-            Stack => *self <<= (self.sp, val),
-            Indirect => *self <<= (HL << self, val),
+            Stack => { self.sp -= 2; *self <<= (self.sp, val) },
+            Indirect => *self <<= (HL << &*self, val),
         };
     }
 }
@@ -124,8 +126,22 @@ impl Shl<&State> for Word {
             PSW => u16::from_le_bytes([chip.register[6], chip.flags()]),
             SP => chip.sp,
             RAM(i) => i << chip,
-            Stack => chip.sp << chip,
+            Stack => panic!("Can't push to stack without mutate access"),
             Indirect => (HL << chip) << chip
+        }
+    }
+}
+
+impl Shl<&mut State> for Word {
+    type Output = u16;
+    fn shl(self, chip: &mut State) -> Self::Output {
+        match self {
+            Word::Stack => {
+                let addr = chip.sp;
+                chip.sp += 2;
+                addr << &*chip
+            }
+            _ => self << &*chip,
         }
     }
 }
