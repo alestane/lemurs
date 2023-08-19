@@ -1,3 +1,40 @@
-fn main() {
+#![feature(lazy_cell)]
+
+extern crate _8080;
+use _8080::State;
+
+fn cp_m(ram:  &'static [u8], addr: u16, offset: u16, switch: u8) -> bool {
+    match addr {
+        0 => true,
+        5 => { 
+            match switch {
+                2 => println!("print char routine called"),
+                9 => {
+                    let text = &ram[offset as usize + 3..];
+                    if let Some(text) = text.splitn(2, |c| *c == '$' as u8).next() {
+                        if let Ok(text) = std::str::from_utf8(text) {
+                            println!("{text}");
+                        }
+                    };
+                }
+                _ => ()
+            };
+            true
+        }
+        _ => false,
+    }
     
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn exercise() {
+    let mut ram = vec![0;256];
+    (ram[0], ram[1], ram[2]) = (0xC3, 0x00, 0x01);
+    let mut body = std::fs::read("cpudiag.bin").expect("Couldn't load test file.");
+    ram.append(&mut body);
+    let mut sample = State::from(ram.as_slice());
+    sample.add_callback(&cp_m);
+    let cycles: usize = sample.map(usize::from).sum();
+    println!("Total of {cycles} cycles executed.")
 }
