@@ -44,7 +44,7 @@ pub unsafe extern "C" fn state_ram(state: *const State) -> Option<&'static [u8;1
 #[no_mangle]
 pub unsafe extern "C" fn state_register_debug(state: *mut State, op: extern "C" fn(&'static [u8;1], u16, u16, u8) -> bool) {
     if let Some(state) = state.as_mut() {
-        state.register(op)
+        state.add_callback(&|ram, addr, offset, switch| op(&array::from_ref(&ram[0]), addr, offset, switch))
     };
 }
 

@@ -18,4 +18,4 @@ pub use boxed::Box;
 
 mod chip;
 
-pub use chip::{State, Zone};
+pub use chip::{State, Debugger, Zone};

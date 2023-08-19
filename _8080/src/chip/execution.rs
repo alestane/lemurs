@@ -1,6 +1,6 @@
 use crate::array;
 use super::{State, access::*};
-use core::convert::TryFrom;
+use core::{convert::TryFrom, num::NonZeroU8};
 
 pub enum Op {
     NOP(u8),
@@ -45,13 +45,19 @@ pub enum BadOpcode {
 use Op::*;
 
 impl State {
-	pub fn execute(&mut self) -> u8 {
-		0
+	pub fn execute(&mut self) -> Option<NonZeroU8> {
+		if !self.active { return None };
+        NonZeroU8::new(1)
 	}
 
     pub fn interrupt(&mut self, op: Op) -> Result<bool, BadOpcode> {
         if op.len() == 1 {
-            Ok(self.interrupts && { self.active = true; self.interrupts = false; op.execute_on(self); true })
+            Ok(self.interrupts && { 
+                self.active = true; 
+                self.interrupts = false; 
+                op.execute_on(self); 
+                true 
+            })
         } else {
             Err(BadOpcode::NotUsable(op))
         }
@@ -69,18 +75,18 @@ impl State {
 fn check_listeners(chip: &mut State, addr: u16) -> bool {
     unsafe {
         let ram = array::from_ref(&chip.ram[0]) as *const [u8;1];
-        let offset = Word::DE << &*chip;
-        let switch = chip[Byte::C];
-        chip.callbacks.iter_mut().any(|op| (*op)(&*ram, addr, offset, switch))
+        let offset = Double::DE << &*chip;
+        let switch = chip[Register::C];
+        chip.callbacks.iter().copied().any(|op| op(&*ram, addr, offset, switch))
     }
 }
 
 impl Op {
-    fn execute_on(self, chip: &mut State) -> u8 {
-        match self {
+    fn execute_on(self, chip: &mut State) -> Option<NonZeroU8> {
+        let cycles = match self {
             Call{sub} => {
                 #[cfg(debug_assertions)]
-                if check_listeners(chip, sub) { return 0; }
+                if check_listeners(chip, sub) { return None; }
                 *chip <<= (Word::Stack, chip.pc);
                 chip.pc = sub;
                 17
@@ -91,6 +97,7 @@ impl Op {
                 11
             }
             NOP(n) => n,
-        }
+        };
+        NonZeroU8::new(cycles)
     }
 }
