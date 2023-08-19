@@ -1,11 +1,12 @@
 #![allow(dead_code)]
 
 use crate::{vec, vec::Vec};
+use core::num::NonZeroU8;
 
 pub(self) mod access;
 mod execution;
 
-pub type Debugger = &'static mut dyn FnMut(&'static [u8;1], u16, u16, u8) -> bool;
+pub type Debugger = &'static dyn Fn(&'static [u8], u16, u16, u8) -> bool;
 
 pub struct State {
 	ram: Vec<u8>,
@@ -60,6 +61,13 @@ impl From<&[u8]> for State {
 			ram: Vec::from(if memory.len() > 0x010000 {&memory[..0x010000]} else {memory}), 
 			..Self::new()
 		}
+	}
+}
+
+impl Iterator for State {
+	type Item = u8;
+	fn next(&mut self) -> Option<Self::Item> {
+		self.execute().map(NonZeroU8::get)
 	}
 }
 
