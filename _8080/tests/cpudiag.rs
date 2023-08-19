@@ -29,9 +29,10 @@ fn cp_m(ram:  &'static [u8], addr: u16, offset: u16, switch: u8) -> bool {
 #[cfg(debug_assertions)]
 #[test]
 fn exercise() {
+    println!("currently at {}", std::env::current_dir().unwrap().display());
     let mut ram = vec![0;256];
     (ram[0], ram[1], ram[2]) = (0xC3, 0x00, 0x01);
-    let mut body = std::fs::read("cpudiag.bin").expect("Couldn't load test file.");
+    let mut body = std::fs::read("tests/cpudiag.bin").expect("Couldn't load test file.");
     ram.append(&mut body);
     let mut sample = State::from(ram.as_slice());
     sample.add_callback(&cp_m);
