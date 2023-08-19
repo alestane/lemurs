@@ -6,6 +6,12 @@ pub enum Op {
     Call(u16),
 }
 
+impl State {
+	pub fn execute(&mut self) -> u8 {
+		0
+	}
+}
+
 use Op::*;
 
 #[cfg(debug_assertions)]
@@ -14,7 +20,7 @@ fn check_listeners(chip: &mut State, addr: u16) -> bool {
         let ram = array::from_ref(&chip.ram[0]) as *const [u8;1];
         let offset = Word::DE << chip;
         let switch = chip[Byte::C];
-        chip.callbacks.iter().any(|op| op(&*ram, addr, offset, switch))
+        chip.callbacks.iter_mut().any(|op| (*op)(&*ram, addr, offset, switch))
     }
 }
 

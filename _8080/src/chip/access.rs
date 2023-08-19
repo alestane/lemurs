@@ -1,6 +1,13 @@
-use core::ops::{Shl, ShlAssign, Index, IndexMut};
+use core::ops::{Deref, Shl, ShlAssign, Index, IndexMut};
 
 use super::State;
+
+impl Deref for State {
+	type Target = [u8];
+	fn deref(&self) -> &Self::Target {
+		&self.ram[..]
+	}
+}
 
 pub enum Byte {
 	B,
@@ -152,7 +159,10 @@ impl IndexMut<Zone> for State {
 		match z {
 			Zone::In => &mut self.port_in[..],
 			Zone::Out => &mut self.port_out[..0],
+            #[cfg(not(debug_assertions))]
 			Zone::RAM => &mut self.ram[..0],
+            #[cfg(debug_assertions)]
+            Zone::RAM => &mut self.ram[..],
 		}		
 	}
 }
