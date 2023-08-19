@@ -1,6 +1,7 @@
 [workspace]
 members = ["_8080", "_8080/cpp8080", "cpp_panic.rs", "cpp_alloc.rs"]
 resolver = "2"
+default-members = ["_8080"]
 
 [workspace.dependencies]
 cpp_panic = { path = "cpp_panic.rs" }
