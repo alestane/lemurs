@@ -40,11 +40,45 @@ pub enum BadOpcode {
     Invalid([u8;1]),
     InvalidPair([u8;2]),
     InvalidTriple([u8;3]),
+    NoData,
+}
+
+impl TryFrom<[u8;1]> for Op {
+    type Error = [u8;1];
+    fn try_from(value: [u8;1]) -> Result<Self, Self::Error> {
+        Err(value)
+    }
+}
+
+impl TryFrom<[u8;2]> for Op {
+    type Error = [u8;2];
+    fn try_from(value: [u8;2]) -> Result<Self, Self::Error> {
+        Err(value)
+    }
+}
+
+impl TryFrom<[u8;3]> for Op {
+    type Error = [u8;3];
+    fn try_from(value: [u8;3]) -> Result<Self, Self::Error> {
+        Err(value)
+    }
 }
 
 impl Op {
     fn extract(value: &[u8]) -> Result<(Self, usize), BadOpcode> {
-        Err(BadOpcode::Invalid([0]))
+        let mut bytes = value.iter().copied();
+        let code = match Op::try_from([bytes.next().ok_or(BadOpcode::NoData)?]) {
+            Ok(op) => return Ok((op, 1)),
+            Err(code) => code,
+        };
+        let code = match Op::try_from([code[0], bytes.next().ok_or(BadOpcode::Invalid(code))?]) {
+            Ok(op) => return Ok((op, 2)),
+            Err(code) => code,
+        };
+        match Op::try_from([code[0], code[1], bytes.next().ok_or(BadOpcode::InvalidPair(code))?]) {
+            Ok(op) => Ok((op, 3)),
+            Err(code) => Err(BadOpcode::InvalidTriple(code))
+        }
     }
 }
 
@@ -57,7 +91,7 @@ impl State {
         self.pc += len as u16; 
         let elapsed = op.execute_on(self);
         if self.pc as usize >= self.ram.len() { self.active = false };
-        elapsed
+        elapsed.or_else(|| { self.active = false; None })
 	}
 
     pub fn interrupt(&mut self, op: Op) -> Result<bool, BadOpcode> {
