@@ -42,12 +42,22 @@ pub enum BadOpcode {
     InvalidTriple([u8;3]),
 }
 
+impl Op {
+    fn extract(value: &[u8]) -> Result<(Self, usize), BadOpcode> {
+        Err(BadOpcode::Invalid([0]))
+    }
+}
+
 use Op::*;
 
 impl State {
 	pub fn execute(&mut self) -> Option<NonZeroU8> {
 		if !self.active { return None };
-        NonZeroU8::new(1)
+        let (op, len) = Op::extract(&self.ram[self.pc as usize..]).ok()?;
+        self.pc += len as u16; 
+        let elapsed = op.execute_on(self);
+        if self.pc as usize >= self.ram.len() { self.active = false };
+        elapsed
 	}
 
     pub fn interrupt(&mut self, op: Op) -> Result<bool, BadOpcode> {
