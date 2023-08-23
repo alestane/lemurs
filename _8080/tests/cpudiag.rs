@@ -3,9 +3,9 @@
 extern crate _8080;
 use _8080::State;
 
-fn cp_m(ram:  &'static [u8], addr: u16, offset: u16, switch: u8) -> bool {
+fn cp_m(ram:  &[u8], addr: u16, offset: u16, switch: u8) -> Option<Result<String, String>> {
     match addr {
-        0 => true,
+        0 => Some(Err(String::from("aborted"))),
         5 => { 
             match switch {
                 2 => println!("print char routine called"),
@@ -19,9 +19,9 @@ fn cp_m(ram:  &'static [u8], addr: u16, offset: u16, switch: u8) -> bool {
                 }
                 _ => ()
             };
-            true
+            Some(Err(format!("Called end display routine at {offset}")))
         }
-        _ => false,
+        _ => None,
     }
     
 }
