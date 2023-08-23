@@ -1,7 +1,7 @@
 #![no_std]
 
-extern crate cpp_panic;
-extern crate cpp_alloc;
+#[cfg(all(not(test), any(feature="cpp_panic",feature="cpp_alloc",feature="cpp_fmt")))]
+extern crate cpp;
 
 use _8080::{State, Box, Zone};
 
@@ -42,15 +42,19 @@ pub unsafe extern "C" fn state_ram(state: *const State) -> Option<&'static [u8;1
 
 #[cfg(debug_assertions)]
 #[no_mangle]
-pub unsafe extern "C" fn state_register_debug(state: *mut State, op: extern "C" fn(&'static [u8;1], u16, u16, u8) -> bool) {
+pub unsafe extern "C" fn state_register_debug(state: *mut State, op: extern "C" fn(*const [u8;1], u16, u16, u8) -> bool) {
     if let Some(state) = state.as_mut() {
-        state.add_callback(&|ram, addr, offset, switch| op(&array::from_ref(&ram[0]), addr, offset, switch))
+        state.add_callback(move |ram, addr, offset, switch| op(array::from_ref(&ram[0]) as *const _, addr, offset, switch)) 
     };
 }
 
 #[no_mangle]
-pub unsafe extern "C-unwind" fn state_execute(state: *mut State) -> u8 {
-    state.as_mut()
-    .expect("null or invalid state pointer")
-    .execute()
+pub unsafe extern "C-unwind" fn state_execute(state: *mut State) -> Option<core::num::NonZeroU8> {
+    for cycles in state.as_mut()
+        .expect("null or invalid state pointer")
+        .execute() 
+    {
+        return Some(cycles);
+    }
+    None
 }
