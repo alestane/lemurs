@@ -1,12 +1,11 @@
 #![allow(dead_code)]
 
-use crate::{vec, vec::Vec};
-use core::num::NonZeroU8;
+use crate::{vec, vec::Vec, num::NonZeroU8};
 
 pub(self) mod access;
 mod execution;
 
-pub type Debugger = &'static dyn Fn(&'static [u8], u16, u16, u8) -> bool;
+pub trait Debugger = Fn(&[u8], u16, u16, u8) -> execution::Failure;
 
 pub struct State {
 	ram: Vec<u8>,
@@ -18,7 +17,7 @@ pub struct State {
 	pc: u16,
 	sp: u16,
 	#[cfg(debug_assertions)]
-	callbacks: Vec<Debugger>,
+	callbacks: Vec<crate::Box<dyn Debugger>>,
 }
 
 use core::convert::From;
@@ -67,13 +66,13 @@ impl From<&[u8]> for State {
 impl Iterator for State {
 	type Item = u8;
 	fn next(&mut self) -> Option<Self::Item> {
-		self.execute().map(NonZeroU8::get)
+		self.execute().into_iter().map(NonZeroU8::get).next()
 	}
 }
 
 #[cfg(debug_assertions)]
 impl State {
-	pub fn add_callback(&mut self, op: Debugger) {
-		self.callbacks.push(op);
+	pub fn add_callback<T: Debugger + 'static>(&mut self, op: T) {
+		self.callbacks.push(crate::Box::new(op));
 	}
 }
