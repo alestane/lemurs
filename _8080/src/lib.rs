@@ -15,7 +15,8 @@ mod foundation {
     pub use alloc::{boxed, vec, string};
     pub use core::{array, convert, num, result, ops};
 }
-use foundation::{*, string::String, result::Result};
+pub use foundation::string::String;
+use foundation::{*, result::Result};
 use foundation::vec::Vec;
 pub use boxed::Box;
 

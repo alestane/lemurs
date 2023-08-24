@@ -3,9 +3,9 @@
 #[cfg(all(not(test), any(feature="cpp_panic",feature="cpp_alloc",feature="cpp_fmt")))]
 extern crate cpp;
 
-use _8080::{State, Box, Zone};
+use _8080::{State, Box, Zone, String};
 
-use core::{array, convert::TryFrom};
+use core::{array, convert::TryFrom, ptr::NonNull, ffi::CStr};
 
 #[no_mangle]
 pub unsafe extern "C" fn entrust_blank_state(memory: usize) -> *mut State {
@@ -40,14 +40,28 @@ pub unsafe extern "C" fn state_ram(state: *const State) -> Option<&'static [u8;1
         .map(|state| array::from_ref(&state[Zone::RAM][0]))
 }
 
+#[repr(C)]
+pub struct CError(Option<NonNull<[u8;1]>>, bool);
+
 #[cfg(debug_assertions)]
 #[no_mangle]
-pub unsafe extern "C" fn state_register_debug(state: *mut State, op: extern "C" fn(*const [u8;1], u16, u16, u8) -> bool) {
+pub unsafe extern "C" fn state_register_debug(state: *mut State, op: extern "C" fn(*const [u8;1], u16, u16, u8) -> CError) {
     if let Some(state) = state.as_mut() {
-        state.add_callback(move |ram, addr, offset, switch| op(array::from_ref(&ram[0]) as *const _, addr, offset, switch)) 
+        state.add_callback(
+            move |ram, addr, offset, switch| {
+                let outcome = op(array::from_ref(&ram[0]) as *const _, addr, offset, switch);
+                outcome.0.map(
+                    |bytes| {
+                        let txt = || String::from(unsafe { CStr::from_ptr(bytes.as_ref()[0] as *const _)}.to_string_lossy());
+                        outcome.1.then(txt).ok_or_else(txt)
+                    }
+                )
+            }
+        ) 
     };
 }
 
+#[allow(for_loops_over_fallibles)]
 #[no_mangle]
 pub unsafe extern "C-unwind" fn state_execute(state: *mut State) -> Option<core::num::NonZeroU8> {
     for cycles in state.as_mut()
