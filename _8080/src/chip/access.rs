@@ -57,6 +57,15 @@ impl State<'_> {
             bits & 0b10000000 != 0,
         );
     }
+    fn set_flags(&mut self, flags: [Option<bool>; 5]) {
+        let [minus, zero, aux, parity, carry] = flags;
+        if minus.is_some()  { self.m = unsafe{ minus.unwrap_unchecked() } }
+        if zero.is_some()   { self.z = unsafe{ zero.unwrap_unchecked() } }
+        if aux.is_some()    { self.a = unsafe{ aux.unwrap_unchecked() } }
+        if parity.is_some() { self.p = unsafe{ parity.unwrap_unchecked() } }
+        if carry.is_some()  { self.c = unsafe{ carry.unwrap_unchecked() } }
+
+    }
 }
 
 impl Index<u16> for State<'_> {
