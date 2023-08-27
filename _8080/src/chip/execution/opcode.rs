@@ -1,16 +1,31 @@
-use crate::convert::TryFrom;
+use crate::{convert::TryFrom, chip::access::{Word, Double}};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Op {
     NOP(u8),
     Call{sub: u16},
+    Jump{to: u16},
+    LoadExtendedImmediate{to: Word},
     Reset{vector: u8},
+    ReturnIf(Test),
 }
 use Op::*;
 
+impl From<u8> for Word {
+    fn from(value: u8) -> Self {
+        match value & 0b00_11_0000 {
+            0b00_00_0000 => Word::Wide(Double::BC),
+            0b00_01_0000 => Word::Wide(Double::DE),
+            0b00_10_0000 => Word::Wide(Double::HL),
+            0b00_11_0000 => Word::SP,
+            _ => unreachable!(),
+        }
+    }
+}
+
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
-enum Flag {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Flag {
     Zero,
     Carry,
     Parity,
@@ -18,8 +33,8 @@ enum Flag {
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
-enum Test {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Test {
     Not(Flag),
     Is(Flag),
 }
@@ -27,41 +42,69 @@ enum Test {
 use Flag::*;
 use Test::*;
 
-#[allow(non_upper_case_globals)]
-mod b11111111 {
-    pub const RotateLeftCarrying: u8        = 0b00000111;
-    pub const RotateRightCarrying: u8       = 0b00001111;
-    pub const RotateAccumulatorLeft: u8     = 0b00010111;
-    pub const RotateAccumulatorRight: u8    = 0b00011111;
-
-    pub const DecimalAddAdjust: u8      = 0b00100111;
-    pub const ComplementAccumulator: u8 = 0b00101111;
-
-    pub const SetCarry: u8          = 0b00110111;
-    pub const ComplementCarry: u8   = 0b00111111;
-
-    pub const Halt: u8      = 0b01110110;
-    pub const Return: u8    = 0b11001001;
-
-    pub const Output: u8    = 0b11010011;
-    pub const Input: u8     = 0b11011011;
-
-    pub const ExchangeTopWithHilo: u8       = 0b11100011;
-    pub const ProgramCounterFromHilo: u8    = 0b11101001;
-    pub const ExchangeDoubleWithHilo: u8    = 0b11101011;
-    pub const StackPointerFromHilo: u8      = 0b11111001;
-
-
+impl From<u8> for Test {
+fn from(value: u8) -> Self {
+        let test = match (value & 0b00_11_0_000) >> 4 {
+            0b00 => Zero,
+            0b01 => Carry,
+            0b10 => Parity,
+            0b11 => Sign,
+            _ => unreachable!()
+        };
+        match (value & 0b00_00_1_000) >> 3  {
+            0b0 => Not(test),
+            0b1 => Is(test),
+            _ => unreachable!()
+        }
+    }
 }
 
+#[disclose]
+#[allow(non_upper_case_globals)]
+mod b11111111 {
+    const NoOp: u8 = 0b00000000;
+    const RotateLeftCarrying: u8        = 0b00000111;
+    const RotateRightCarrying: u8       = 0b00001111;
+    const RotateAccumulatorLeft: u8     = 0b00010111;
+    const RotateAccumulatorRight: u8    = 0b00011111;
+
+    const DecimalAddAdjust: u8      = 0b00100111;
+    const ComplementAccumulator: u8 = 0b00101111;
+
+    const SetCarry: u8          = 0b00110111;
+    const ComplementCarry: u8   = 0b00111111;
+
+    const Halt: u8      = 0b01110110;
+    const Return: u8    = 0b11001001;
+
+    const Output: u8    = 0b11010011;
+    const Input: u8     = 0b11011011;
+
+    const ExchangeTopWithHilo: u8       = 0b11100011;
+    const ProgramCounterFromHilo: u8    = 0b11101001;
+    const ExchangeDoubleWithHilo: u8    = 0b11101011;
+    const StackPointerFromHilo: u8      = 0b11111001;
+
+    const StoreHiLoDirect: u8   = 0b00100010;
+    const Jump: u8  = 0b11000011;
+}
+
+#[disclose]
+#[allow(non_upper_case_globals)]
+mod b11_00_1111 {
+    const LoadExtendedImmediate: u8 = 0x01;
+}
+
+#[disclose]
 #[allow(non_upper_case_globals)]
 mod b11_000_111 {
-    pub const Reset: u8 = 0b11_000_111;
-    pub const ReturnIf: u8 = 0b11_000_000;
-    pub const CallIf: u8 = 0b11_000_100;
+    const Reset: u8 = 0b11_000_111;
+    const ReturnIf: u8 = 0b11_000_000;
+    const CallIf: u8 = 0b11_000_100;
 }
 
 pub struct OutOfRange;
+#[derive(Debug)]
 pub enum Error {
     NotUsable(Op),
     Mismatch(Op, u8),
@@ -80,8 +123,13 @@ impl TryFrom<[u8;1]> for Op {
     fn try_from(value: [u8;1]) -> Result<Self, Self::Error> {
         {
             let value = value[0];
+            let value = match value & 0b11111111 {
+                b11111111::NoOp => return Ok(NOP(4)),
+                _ => value
+            };
             let _value = match value & 0b11_000_111 {
                 b11_000_111::Reset => return Ok(Reset{vector: value >> 3 & 0x07}),
+                b11_000_111::ReturnIf => return Ok(ReturnIf(Test::from(value))),
                 _ => value,
             };
         }
@@ -99,6 +147,15 @@ impl TryFrom<[u8;2]> for Op {
 impl TryFrom<[u8;3]> for Op {
     type Error = [u8;3];
     fn try_from(value: [u8;3]) -> Result<Self, Self::Error> {
+        let action = value[0];
+        let action = match action {
+            b11111111::Jump => return Ok(Jump{to: u16::from_le_bytes([value[1], value[2]])}),
+            next => next,
+        };
+        let _action = match action {
+            b11_00_1111::LoadExtendedImmediate => return Ok(LoadExtendedImmediate { to: Word::from(action) }),
+            next => next,
+        };
         Err(value)
     }
 }
@@ -125,5 +182,30 @@ impl Op {
             Ok(op) => Ok((op, 3)),
             Err(code) => Err(Error::InvalidTriple(code))
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn no_op() {
+        let op = Op::extract(&[0x00]).unwrap();
+        assert_eq!(op.0, NOP(4));
+    }
+
+    #[test]
+    fn reset_from_val() {
+        let op = Op::try_from([0xD7]).unwrap();
+        assert_eq!(op, Reset{vector: 2});
+    }
+
+    #[test]
+    fn return_if() {
+        let op = Op::try_from([0xD8]).unwrap();
+        assert_eq!(op, ReturnIf(Is(Carry)));
+        let op = Op::try_from([0xF0]).unwrap();
+        assert_eq!(op, ReturnIf(Not(Sign)))
     }
 }
