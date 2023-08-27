@@ -16,7 +16,7 @@ impl State<'_> {
 	pub fn execute(&mut self) -> OpOutcome {
 		if !self.active { return Ok(NonZeroU8::new(1)) };
         let (op, len) = Op::extract(&self.board.deref()[self.pc as usize..])
-            .map_err(|e| panic!("Couldn't extract opcode from {e:?}")).unwrap();
+            .map_err(|e| panic!("Couldn't extract opcode from {e:?} at {:X}", self.pc)).unwrap();
         self.pc += len as u16; 
         let outcome = op.execute_on(self);
         match outcome {
@@ -69,6 +69,10 @@ impl Op {
             }
             Jump{to} => {
                 chip.pc = to;
+                10
+            }
+            LoadExtendedImmediate { to, value } => {
+                *chip <<= (to, value);
                 10
             }
             Reset{vector} => {

@@ -3,9 +3,10 @@ use crate::{convert::TryFrom, chip::access::{Word, Double}};
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Op {
     NOP(u8),
+    AndImmediate{value: u8},
     Call{sub: u16},
     Jump{to: u16},
-    LoadExtendedImmediate{to: Word},
+    LoadExtendedImmediate{to: Word, value: u16 },
     Reset{vector: u8},
     ReturnIf(Test),
 }
@@ -85,6 +86,8 @@ mod b11111111 {
     const ExchangeDoubleWithHilo: u8    = 0b11101011;
     const StackPointerFromHilo: u8      = 0b11111001;
 
+    const AndImmediate: u8  = 0b11100110;
+
     const StoreHiLoDirect: u8   = 0b00100010;
     const Jump: u8  = 0b11000011;
 }
@@ -104,7 +107,7 @@ mod b11_000_111 {
 }
 
 pub struct OutOfRange;
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Error {
     NotUsable(Op),
     Mismatch(Op, u8),
@@ -140,6 +143,11 @@ impl TryFrom<[u8;1]> for Op {
 impl TryFrom<[u8;2]> for Op {
     type Error = [u8;2];
     fn try_from(value: [u8;2]) -> Result<Self, Self::Error> {
+        let [action, data] = value;
+        let _action = match action {
+            b11111111::AndImmediate => return Ok(AndImmediate { value: data }),
+            next => next,
+        };
         Err(value)
     }
 }
@@ -148,12 +156,13 @@ impl TryFrom<[u8;3]> for Op {
     type Error = [u8;3];
     fn try_from(value: [u8;3]) -> Result<Self, Self::Error> {
         let action = value[0];
+        let data = u16::from_le_bytes([value[1], value[2]]);
         let action = match action {
-            b11111111::Jump => return Ok(Jump{to: u16::from_le_bytes([value[1], value[2]])}),
+            b11111111::Jump => return Ok(Jump{to: data}),
             next => next,
         };
-        let _action = match action {
-            b11_00_1111::LoadExtendedImmediate => return Ok(LoadExtendedImmediate { to: Word::from(action) }),
+        let _action = match action & 0b11_00_1111 {
+            b11_00_1111::LoadExtendedImmediate => return Ok(LoadExtendedImmediate { to: Word::from(action), value: data }),
             next => next,
         };
         Err(value)
@@ -197,15 +206,23 @@ mod test {
 
     #[test]
     fn reset_from_val() {
-        let op = Op::try_from([0xD7]).unwrap();
-        assert_eq!(op, Reset{vector: 2});
+        let op = Op::extract(&[0xD7]).unwrap();
+        assert_eq!(op.0, Reset{vector: 2});
     }
 
     #[test]
     fn return_if() {
-        let op = Op::try_from([0xD8]).unwrap();
-        assert_eq!(op, ReturnIf(Is(Carry)));
-        let op = Op::try_from([0xF0]).unwrap();
-        assert_eq!(op, ReturnIf(Not(Sign)))
+        let op = Op::extract(&[0xD8]).unwrap();
+        assert_eq!(op.0, ReturnIf(Is(Carry)));
+        let op = Op::extract(&[0xF0]).unwrap();
+        assert_eq!(op.0, ReturnIf(Not(Sign)))
+    }
+
+    #[test]
+    fn load_xi() {
+        let op = Op::extract(&[0x31, 0x25, 0x02]).unwrap();
+        assert_eq!(op.0, LoadExtendedImmediate { to: Word::SP, value: 549 });
+        let fail = Op::extract(&[0x11, 0x21]).unwrap_err();
+        assert_eq!(fail, Error::InvalidPair([0x11, 0x21]));
     }
 }
