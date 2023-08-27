@@ -23,7 +23,7 @@ pub enum Double {
     HL = 2,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Byte {
     Single(Register),
     RAM(u16),
