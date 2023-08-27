@@ -57,11 +57,16 @@ impl State<'_> {
             _ => Err(opcode::OutOfRange)
         }
     }
-}
+    }
 
 impl Op {
     fn execute_on(self, chip: &mut State) -> OpOutcome {
         let cycles = match self {
+            AndImmediate { value } => {
+                chip[Byte::Single(Register::A)] &= value;
+                *chip.update_flags() = false;
+                7
+            }
             Call{sub} => {
                 *chip <<= (Word::Stack, chip.pc);
                 chip.pc = sub;

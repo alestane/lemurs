@@ -40,7 +40,7 @@ pub enum Word {
 }
 
 impl State<'_> {
-    fn flags(&self) -> u8 {
+    pub fn flags(&self) -> u8 {
         self.c as u8 | 
         0b10u8 |
         (self.p as u8) << 2 |
@@ -48,7 +48,7 @@ impl State<'_> {
         (self.z as u8) << 6 |
         (self.m as u8) << 7
     }
-    fn extract_flags(&mut self, bits: u8) {
+    pub fn extract_flags(&mut self, bits: u8) {
         (self.c, self.p, self.a, self.z, self.m) = (
             bits & 0b00000001 != 0, 
             bits & 0b00000100 != 0,
@@ -57,14 +57,17 @@ impl State<'_> {
             bits & 0b10000000 != 0,
         );
     }
-    fn set_flags(&mut self, flags: [Option<bool>; 5]) {
-        let [minus, zero, aux, parity, carry] = flags;
-        if minus.is_some()  { self.m = unsafe{ minus.unwrap_unchecked() } }
-        if zero.is_some()   { self.z = unsafe{ zero.unwrap_unchecked() } }
-        if aux.is_some()    { self.a = unsafe{ aux.unwrap_unchecked() } }
-        if parity.is_some() { self.p = unsafe{ parity.unwrap_unchecked() } }
-        if carry.is_some()  { self.c = unsafe{ carry.unwrap_unchecked() } }
-
+    pub fn update_flags(&mut self) -> &mut bool {
+        let accumulator = self.register[6];
+        let mut parity = accumulator;
+        for offset in [4, 2, 1] {
+            parity ^= parity >> offset;
+        }
+        self.p = parity & 0b01 != 0;
+        self.z = accumulator == 0;
+        self.m = accumulator & 0b1000_0000 != 0;
+        self.a = false;
+        &mut self.c
     }
 }
 
