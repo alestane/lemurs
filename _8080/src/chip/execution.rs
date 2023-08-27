@@ -67,6 +67,10 @@ impl Op {
                 chip.pc = sub;
                 17
             }
+            Jump{to} => {
+                chip.pc = to;
+                10
+            }
             Reset{vector} => {
                 *chip <<= (Word::Stack, chip.pc);
                 chip.pc = vector as u16 * 8;
