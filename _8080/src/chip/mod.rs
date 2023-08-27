@@ -1,78 +1,98 @@
 #![allow(dead_code)]
 
-use crate::{vec, vec::Vec, num::NonZeroU8};
+pub use execution::opcode;
 
+use core::cell::UnsafeCell;
+
+use crate::{String, Harness, ops::{Deref, Index,IndexMut}};
+
+#[cfg(not(debug_assertions))]
 pub(self) mod access;
+#[cfg(debug_assertions)]
+pub mod access;
 mod execution;
 
-pub trait Debugger = Fn(&[u8], u16, u16, u8) -> execution::Failure;
+pub struct Socket(UnsafeCell<u8>);
 
-pub struct State {
-	ram: Vec<u8>,
-	port_in: [u8;256],
-	port_out: [u8;256],
+impl Socket {
+	pub fn new() -> Self {
+		Self::default()
+	}
+}
+
+impl Default for Socket {
+	fn default() -> Self{
+		Socket(UnsafeCell::default())
+	}
+}
+
+impl Index<u16> for Socket {
+	type Output = u8;
+	fn index(&self, _index: u16) -> &Self::Output { let i = self.0.get(); unsafe {*i = 0; &*i} }
+}
+
+impl IndexMut<u16> for Socket {
+	fn index_mut(&mut self, _index: u16) -> &mut Self::Output { let i = self.0.get_mut(); *i = 0; i }
+}
+
+impl Deref for Socket {
+	type Target = [u8];
+	fn deref(&self) -> &Self::Target {
+		core::slice::from_ref(unsafe{self.0.get().as_ref().unwrap_unchecked()})
+	}
+}
+
+impl Harness for Socket {
+	fn input(&mut self, _port: u8) -> u8 { 0 }
+	fn output(&mut self, _port: u8, _value: u8) { }
+}
+
+#[cfg_attr(debug_assertions, disclose)]
+pub struct State<'a> {
+	board: &'a mut dyn Harness,
 	register: [u8;7],
 	c: bool, a: bool, p: bool, m: bool, z: bool,
 	active: bool, interrupts: bool,
 	pc: u16,
 	sp: u16,
-	#[cfg(debug_assertions)]
-	callbacks: Vec<crate::Box<dyn Debugger>>,
 }
 
-use core::convert::From;
+pub use access::Byte;
 
-pub use access::{Byte, Zone};
-
-impl State {
-	pub fn new() -> Self {
-		Self { 
-			ram: Vec::new(), 
-			port_in: [0;256],
-			port_out: [0;256], 
+impl<'a> State<'a> {
+	pub fn with(board: &'a mut dyn Harness) -> Self {
+		Self {
+			board: board, 
 			register: [0;7], 
 			c: false, a: false, p: false, m: false, z: false, 
 			active: true, interrupts: false, 
 			pc: 0, sp: 0, 
-			#[cfg(debug_assertions)]
-			callbacks: Vec::new(),
 		}
 	}
 
-	pub fn with_ram(memory: u16) -> Self {
-		let memory = if memory == 0 { 0x010000 } else { memory as usize }; 
-		Self {
-			ram: vec![0;memory], 
-			..Self::new()
-		}
-	}
-}
-
-impl Default for State {
-	fn default() -> Self {
-		Self::with_ram(0x0100)
-	}
-}
-
-impl From<&[u8]> for State {
-	fn from(memory: &[u8]) -> Self {
-		State{
-			ram: Vec::from(if memory.len() > 0x010000 {&memory[..0x010000]} else {memory}), 
-			..Self::new()
-		}
-	}
-}
-
-impl Iterator for State {
-	type Item = u8;
-	fn next(&mut self) -> Option<Self::Item> {
-		self.execute().into_iter().map(NonZeroU8::get).next()
+	pub fn embed(&mut self, board: &'a mut dyn Harness) {
+		self.board = board;
 	}
 }
 
 #[cfg(debug_assertions)]
-impl State {
-	pub fn add_callback<T: Debugger + 'static>(&mut self, op: T) {
-		self.callbacks.push(crate::Box::new(op));
+impl Iterator for State<'_> {
+	type Item = Result<u8, Result<String, String>>;	
+	fn next(&mut self) -> Option<Self::Item> {
+		let result = self.execute();
+		match result {
+			Ok(Some(cycles)) => Some(Ok(cycles.get())),
+			Ok(None) => None,
+			Err(e) => Some(Err(e)),
+		}
 	}
 }
+
+#[cfg(not(debug_assertions))]
+impl Iterator for State<'_> {
+	type Item = u8;
+	fn next(&mut self) -> Option<Self::Item> {
+		self.execute().map(NonZeroU8::get)
+	}
+}
+
