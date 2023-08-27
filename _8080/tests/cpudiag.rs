@@ -1,41 +1,33 @@
-#![feature(lazy_cell)]
+#![feature(generic_arg_infer)]
 
 extern crate _8080;
 use _8080::State;
 
-fn cp_m(ram:  &[u8], addr: u16, offset: u16, switch: u8) -> Option<Result<String, String>> {
-    match addr {
-        0 => Some(Err(String::from("aborted"))),
-        5 => { 
-            match switch {
-                2 => println!("print char routine called"),
-                9 => {
-                    let text = &ram[offset as usize + 3..];
-                    if let Some(text) = text.splitn(2, |c| *c == '$' as u8).next() {
-                        if let Ok(text) = std::str::from_utf8(text) {
-                            println!("{text}");
-                        }
-                    };
-                }
-                _ => ()
-            };
-            Some(Err(format!("Called end display routine at {offset}")))
-        }
-        _ => None,
-    }
-    
+mod src {
+    pub mod cp_m;
 }
+use src::*;
 
 #[cfg(debug_assertions)]
 #[test]
 fn exercise() {
     println!("currently at {}", std::env::current_dir().unwrap().display());
-    let mut ram = vec![0;256];
-    (ram[0], ram[1], ram[2]) = (0xC3, 0x00, 0x01);
-    let mut body = std::fs::read("tests/cpudiag.bin").expect("Couldn't load test file.");
-    ram.append(&mut body);
-    let mut sample = State::from(ram.as_slice());
-    sample.add_callback(&cp_m);
-    let cycles: usize = sample.map(usize::from).sum();
+    let body = std::fs::read("tests/cpudiag.bin").expect("Couldn't load test file.");
+    let mut machine = cp_m::CP_M::with_program(&body);
+    let sample = State::with(&mut machine);
+    let mut cycles = 0usize;
+    for outcome in sample {
+        match outcome {
+            Ok(duration) => cycles += usize::from(duration),
+            Err(Ok(txt)) => {
+                println!("Completed successfully!\n{txt}\n");
+                break;
+            }
+            Err(Err(txt)) => {
+                panic!("Stopped without completing.\n{txt}\n");
+            }
+        }
+    };
+//    sample.map(usize::from).sum();
     println!("Total of {cycles} cycles executed.")
 }
