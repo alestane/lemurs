@@ -76,6 +76,10 @@ impl Op {
                 chip.pc = to;
                 10
             }
+            JumpIf(test, addr) => {
+                if test.approves(chip) { chip.pc = addr; }
+                10
+            }
             LoadExtendedImmediate { to, value } => {
                 *chip <<= (to, value);
                 10

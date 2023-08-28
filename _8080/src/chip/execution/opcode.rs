@@ -6,6 +6,7 @@ pub enum Op {
     AndImmediate{value: u8},
     Call{sub: u16},
     Jump{to: u16},
+    JumpIf(Test, u16),
     LoadExtendedImmediate{to: Word, value: u16 },
     Reset{vector: u8},
     ReturnIf(Test),
@@ -42,6 +43,21 @@ pub enum Test {
 
 use Flag::*;
 use Test::*;
+
+impl Test {
+    pub fn approves(self, env: &super::State) -> bool {
+        match self {
+            Not(Zero) => !env.z,
+            Is(Zero) => env.z,
+            Not(Carry) => !env.c,
+            Is(Carry) => env.c,
+            Not(Parity) => !env.p,
+            Is(Parity) => env.p,
+            Not(Sign) => !env.m,
+            Is(Sign) => env.m,
+        }
+    }
+}
 
 impl From<u8> for Test {
 fn from(value: u8) -> Self {
@@ -101,6 +117,7 @@ mod b11_00_1111 {
 #[disclose]
 #[allow(non_upper_case_globals)]
 mod b11_000_111 {
+    const JumpIf: u8 = 0b11_000_010;
     const Reset: u8 = 0b11_000_111;
     const ReturnIf: u8 = 0b11_000_000;
     const CallIf: u8 = 0b11_000_100;
@@ -157,13 +174,17 @@ impl TryFrom<[u8;3]> for Op {
     fn try_from(value: [u8;3]) -> Result<Self, Self::Error> {
         let action = value[0];
         let data = u16::from_le_bytes([value[1], value[2]]);
-        let action = match action {
+        match action {
             b11111111::Jump => return Ok(Jump{to: data}),
-            next => next,
+            _ => action,
         };
-        let _action = match action & 0b11_00_1111 {
+        match action & 0b11_00_1111 {
             b11_00_1111::LoadExtendedImmediate => return Ok(LoadExtendedImmediate { to: Word::from(action), value: data }),
-            next => next,
+            _ => action,
+        };
+        match action & 0b11_000_111 {
+            b11_000_111::JumpIf => return Ok(JumpIf(Test::from(action), data)),
+            _ => action,
         };
         Err(value)
     }
