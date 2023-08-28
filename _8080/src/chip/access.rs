@@ -63,7 +63,7 @@ impl State<'_> {
         for offset in [4, 2, 1] {
             parity ^= parity >> offset;
         }
-        self.p = parity & 0b01 != 0;
+        self.p = parity & 0b01 == 0;
         self.z = accumulator == 0;
         self.m = accumulator & 0b1000_0000 != 0;
         self.a = false;
