@@ -1,3 +1,5 @@
+use core::fmt::UpperHex;
+
 use crate::{convert::TryFrom, chip::access::{Word, Double}};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -5,6 +7,7 @@ pub enum Op {
     NOP(u8),
     AndImmediate{value: u8},
     Call{sub: u16},
+    CallIf(Test, u16),
     Jump{to: u16},
     JumpIf(Test, u16),
     LoadExtendedImmediate{to: Word, value: u16 },
@@ -30,8 +33,8 @@ impl From<u8> for Word {
 pub enum Flag {
     Zero,
     Carry,
-    Parity,
-    Sign,
+    EvenParity,
+    Negative,
 }
 
 #[repr(u8)]
@@ -51,10 +54,10 @@ impl Test {
             Is(Zero) => env.z,
             Not(Carry) => !env.c,
             Is(Carry) => env.c,
-            Not(Parity) => !env.p,
-            Is(Parity) => env.p,
-            Not(Sign) => !env.m,
-            Is(Sign) => env.m,
+            Not(EvenParity) => !env.p,
+            Is(EvenParity) => env.p,
+            Not(Negative) => !env.m,
+            Is(Negative) => env.m,
         }
     }
 }
@@ -64,8 +67,8 @@ fn from(value: u8) -> Self {
         let test = match (value & 0b00_11_0_000) >> 4 {
             0b00 => Zero,
             0b01 => Carry,
-            0b10 => Parity,
-            0b11 => Sign,
+            0b10 => EvenParity,
+            0b11 => Negative,
             _ => unreachable!()
         };
         match (value & 0b00_00_1_000) >> 3  {
@@ -106,6 +109,7 @@ mod b11111111 {
 
     const StoreHiLoDirect: u8   = 0b00100010;
     const Jump: u8  = 0b11000011;
+    const Call: u8  = 0b11001101;
 }
 
 #[disclose]
@@ -132,6 +136,18 @@ pub enum Error {
     InvalidPair([u8;2]),
     InvalidTriple([u8;3]),
     NoData,
+}
+
+impl UpperHex for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Mismatch(op, code) => write!(f, "Mismatch({op:?}, {code:X})"),
+            Self::Invalid([a]) => write!(f, "Invalid([{a:#04X}])"),
+            Self::InvalidPair([a, b]) => write!(f, "InvalidPair([{a:#04X}, {b:#04X}])"),
+            Self::InvalidTriple([a, b, c]) => write!(f, "InvalidTriple([{a:#04X}, {b:#04X}, {c:#04X}])"),
+            _ => write!(f, "{self:?}"),
+        }
+    }
 }
 
 mod build {
@@ -176,6 +192,7 @@ impl TryFrom<[u8;3]> for Op {
         let data = u16::from_le_bytes([value[1], value[2]]);
         match action {
             b11111111::Jump => return Ok(Jump{to: data}),
+            b11111111::Call => return Ok(Call{sub: data}),
             _ => action,
         };
         match action & 0b11_00_1111 {
@@ -184,6 +201,7 @@ impl TryFrom<[u8;3]> for Op {
         };
         match action & 0b11_000_111 {
             b11_000_111::JumpIf => return Ok(JumpIf(Test::from(action), data)),
+            b11_000_111::CallIf => return Ok(CallIf(Test::from(action), data)),
             _ => action,
         };
         Err(value)
@@ -236,7 +254,7 @@ mod test {
         let op = Op::extract(&[0xD8]).unwrap();
         assert_eq!(op.0, ReturnIf(Is(Carry)));
         let op = Op::extract(&[0xF0]).unwrap();
-        assert_eq!(op.0, ReturnIf(Not(Sign)))
+        assert_eq!(op.0, ReturnIf(Not(Negative)));
     }
 
     #[test]
@@ -245,5 +263,25 @@ mod test {
         assert_eq!(op.0, LoadExtendedImmediate { to: Word::SP, value: 549 });
         let fail = Op::extract(&[0x11, 0x21]).unwrap_err();
         assert_eq!(fail, Error::InvalidPair([0x11, 0x21]));
+    }
+
+    #[test]
+    fn jump() {
+        let op = Op::extract(&[0xC3, 0x74, 0x31]).unwrap();
+        assert_eq!(op.0, Jump { to: 0x3174 });
+        let op = Op::extract(&[0xF2, 0x31, 0x4A]).unwrap();
+        assert_eq!(op.0, JumpIf(Not(Negative), 0x4A31));
+        let fail = Op::extract(&[0xFA]).unwrap_err();
+        assert_eq!(fail, Error::Invalid([0xFA]));
+    }
+
+    #[test]
+    fn call() {
+        let op = Op::extract(&[0xCD, 0xD3, 0x08]).unwrap();
+        assert_eq!(op.0, Call { sub: 0x08D3 });
+        let op = Op::extract(&[0xE4, 0x4B, 0x03]).unwrap();
+        assert_eq!(op.0, CallIf(Not(EvenParity), 0x034B));
+        let fail = Op::extract(&[0xD2, 0x07]).unwrap_err();
+        assert_eq!(fail, Error::InvalidPair([0xD2, 0x07]));
     }
 }
