@@ -72,6 +72,13 @@ impl Op {
                 chip.pc = sub;
                 17
             }
+            CallIf(test, sub) => if test.approves(chip) {
+                *chip <<= (Word::Stack, chip.pc);
+                chip.pc = sub;
+                17
+            } else {
+                11
+            }
             Jump{to} => {
                 chip.pc = to;
                 10
