@@ -5,6 +5,7 @@ use crate::{convert::TryFrom, chip::access::{Word, Double}};
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Op {
     NOP(u8),
+    AddImmediate{value: u8},
     AndImmediate{value: u8},
     Call{sub: u16},
     CallIf(Test, u16),
@@ -106,6 +107,7 @@ mod b11111111 {
     const StackPointerFromHilo: u8      = 0b11111001;
 
     const AndImmediate: u8  = 0b11100110;
+    const AddImmediate: u8  = 0b11000110;
 
     const StoreHiLoDirect: u8   = 0b00100010;
     const Jump: u8  = 0b11000011;
@@ -178,6 +180,7 @@ impl TryFrom<[u8;2]> for Op {
     fn try_from(value: [u8;2]) -> Result<Self, Self::Error> {
         let [action, data] = value;
         let _action = match action {
+            b11111111::AddImmediate => return Ok(AddImmediate { value: data }),
             b11111111::AndImmediate => return Ok(AndImmediate { value: data }),
             next => next,
         };
@@ -283,5 +286,13 @@ mod test {
         assert_eq!(op.0, CallIf(Not(EvenParity), 0x034B));
         let fail = Op::extract(&[0xD2, 0x07]).unwrap_err();
         assert_eq!(fail, Error::InvalidPair([0xD2, 0x07]));
+    }
+
+    #[test]
+    fn adi() {
+        let op = Op::extract(&[0xC6, 0x39, 0x02]).unwrap();
+        assert_eq!(op.0, AddImmediate { value: 0x39 });
+        let fail = Op::extract(&[0xC6]).unwrap_err();
+        assert_eq!(fail, Error::Invalid([0xC6]));
     }
 }

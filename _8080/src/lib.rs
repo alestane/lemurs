@@ -3,6 +3,7 @@
 #![feature(exclusive_range_pattern)]
 #![feature(trait_alias)]
 #![feature(iter_intersperse)]
+#![feature(generic_arg_infer)]
 
 #[macro_use]
 extern crate disclose;
@@ -37,6 +38,16 @@ pub struct SimpleBoard {
 	ram: [u8; 65536],
 	port_out: [u8; 256],
 	port_in: [u8; 256]
+}
+
+impl Default for SimpleBoard {
+    fn default() -> Self {
+        Self {
+            ram: [0; _],
+            port_out: [0; _],
+            port_in: [0; _],
+        }
+    }
 }
 
 impl Deref for SimpleBoard {
