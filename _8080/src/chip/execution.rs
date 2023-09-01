@@ -1,5 +1,5 @@
 use crate::{num::NonZeroU8, String};
-use super::{State, access::*};
+use super::{State, access::{*, Register::*, Double::*}};
 
 pub mod opcode;
 use opcode::{Op, Op::*};
@@ -53,7 +53,7 @@ impl State<'_> {
 
     pub fn reset_to(&mut self, index: usize) -> Result<bool, opcode::OutOfRange> {
         match index {
-            0..8 => Ok(self.interrupt(Op::Reset{vector: index as u8}).ok().unwrap()),
+            0..8 => Ok(self.interrupt(Reset{vector: index as u8}).ok().unwrap()),
             _ => Err(opcode::OutOfRange)
         }
     }
@@ -63,7 +63,7 @@ impl Op {
     fn execute_on(self, chip: &mut State) -> OpOutcome {
         let cycles = match self {
             AddImmediate { value } => {
-                let accumulator = &mut chip[Byte::Single(Register::A)];
+                let accumulator = &mut chip[Byte::Single(A)];
                 let aux = (*accumulator & 0x0F) + (value & 0x0F) > 0x0F;
                 let sign = (*accumulator | value) & 0x80;
                 *accumulator = accumulator.wrapping_add(value);
@@ -72,7 +72,7 @@ impl Op {
                 7
             }
             AndImmediate { value } => {
-                chip[Byte::Single(Register::A)] &= value;
+                chip[Byte::Single(A)] &= value;
                 *chip.update_flags() = false;
                 7
             }
@@ -87,6 +87,11 @@ impl Op {
             } else {
                 11
             }
+            ExchangeDoubleWithHilo => {
+                let reg = &mut chip.register;
+                (reg[2], reg[3], reg[4], reg[5]) = (reg[4], reg[5], reg[2], reg[3]);
+                5
+            }
             Jump{to} => {
                 chip.pc = to;
                 10
@@ -98,6 +103,11 @@ impl Op {
             LoadExtendedImmediate { to, value } => {
                 *chip <<= (to, value);
                 10
+            }
+            Push (source) => {
+                let source = source << &*chip;
+                *chip <<= (Word::Stack, source);
+                11
             }
             Reset{vector} => {
                 *chip <<= (Word::Stack, chip.pc);
@@ -124,7 +134,7 @@ mod test {
      fn add() {
         let mut harness = Socket::default();
         let mut chip = State::with(&mut harness);
-        chip[Byte::Single(Register::A)] = 0x75;
+        chip[Byte::Single(A)] = 0x75;
         AddImmediate { value: 0x49 }.execute_on(&mut chip).unwrap();
         assert_eq!(chip.register[6], 0xBE);
         assert!(!chip.a, "aux carry was {}", chip.a);
@@ -146,7 +156,7 @@ mod test {
      fn and() {
         let mut env = Socket::default();
         let mut chip = State::with(&mut env);
-        chip[Byte::Single(Register::A)] = 0b01011101;
+        chip[Byte::Single(A)] = 0b01011101;
         AndImmediate{ value: 0b11011011 }.execute_on(&mut chip).unwrap();
         assert_eq!(chip.register[6], 0b01011001);
         assert!(!chip.a, "aux carry was {}", chip.a);
@@ -213,8 +223,55 @@ mod test {
     fn load_xi() {
         let mut env = Socket::default();
         let mut chip = State::with(&mut env);
-        LoadExtendedImmediate { to: Word::Wide(Double::HL), value: 0x6472 }.execute_on(&mut chip).unwrap();
+        LoadExtendedImmediate { to: Word::Wide(HL), value: 0x6472 }.execute_on(&mut chip).unwrap();
         assert_eq!(chip.register[4], 0x72);
         assert_eq!(chip.register[5], 0x64);
+    }
+
+    #[test]
+    fn push() {
+        let mut env = SimpleBoard::default();
+        let mut chip = State::with(&mut env);
+        chip.sp = 0x4000;
+        chip <<= (Word::Wide(BC), 0x3256);
+        chip <<= (Word::Wide(HL), 0x7654);
+        chip <<= (Word::Wide(DE), 0x2345);
+        Push(Word::Wide(HL)).execute_on(&mut chip).unwrap();
+        assert_eq!(chip[0x3FFE], 0x54);
+        assert_eq!(chip[0x3FFF], 0x76);
+        assert_eq!(chip.sp, 0x3FFE);
+
+        chip.register[6] = 0x90;
+        AddImmediate { value: 0x73 }.execute_on(&mut chip).unwrap();
+        Push(Word::PSW).execute_on(&mut chip).unwrap();
+        assert_eq!(chip.sp, 0x3FFC);
+        assert_eq!(chip[0x3FFC], 0x03);
+        assert_eq!(chip[0x3FFD], 0b00000111);
+    }
+
+    #[test]
+    fn reset() {
+        let mut env = SimpleBoard::default();
+        let mut chip = State::with(&mut env);
+        chip.pc = 0x0391;
+        chip.sp = 0x0200;
+        Reset{vector: 0x05}.execute_on(&mut chip).unwrap();
+        assert_eq!(chip.pc, 0x0028);
+        assert_eq!(chip.sp, 0x01FE);
+        assert_eq!(chip[0x01FE], 0x91);
+        assert_eq!(chip[0x01FF], 0x03);
+    }
+
+    #[test]
+    fn exchange() {
+        let mut env = Socket::default();
+        let mut chip = State::with(&mut env);
+        chip.register[2] = 0x43;
+        chip.register[3] = 0x2B;
+        chip.register[4] = 0x6C;
+        chip.register[5] = 0xD1;
+        ExchangeDoubleWithHilo.execute_on(&mut chip).unwrap();
+        assert_eq!(Word::Wide(DE) << &chip, 0xD16C);
+        assert_eq!(Word::Wide(HL) << &chip, 0x2B43);
     }
 }

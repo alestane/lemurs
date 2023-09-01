@@ -23,6 +23,8 @@ pub enum Double {
     HL = 2,
 }
 
+use self::{Register::*, Double::*};
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Byte {
     Single(Register),
@@ -88,8 +90,8 @@ impl Index<Register> for State<'_> {
     type Output = u8;
     fn index(&self, index: Register) -> &Self::Output {
         match index {
-            Register::M => &self[Word::Wide(Double::HL) << self],
-            Register::A => &self.register[6],
+            M => &self[Word::Wide(HL) << self],
+            A => &self.register[6],
             index => &self.register[index as usize],
         }
     }
@@ -98,11 +100,11 @@ impl Index<Register> for State<'_> {
 impl IndexMut<Register> for State<'_> {
     fn index_mut(&mut self, index: Register) -> &mut Self::Output {
         match index {
-            Register::M => {
-                let addr = Word::Wide(Double::HL) << &*self;
+            M => {
+                let addr = Word::Wide(HL) << &*self;
                 &mut self[addr]
             }
-            Register::A => &mut self.register[6],
+            A => &mut self.register[6],
             index => &mut self.register[index as usize],
         }
     }
@@ -154,7 +156,7 @@ impl Shl<&State<'_>> for Word {
             SP => chip.sp,
             RAM(i) => i << chip,
             Stack => panic!("Can't pop from stack without mutate access"),
-            Indirect => (Double::HL << chip) << chip
+            Indirect => (HL << chip) << chip
         }
     }
 }
@@ -188,7 +190,7 @@ impl ShlAssign<(Double, u16)> for State<'_> {
 
 impl ShlAssign<(Word, u16)> for State<'_> {
     fn shl_assign(&mut self, (target, val): (Word, u16)) {
-        use Word::*; use Double::*;
+        use Word::*;
         match target {
             Wide(pair) => *self <<= (pair, val),
             PSW => {

@@ -9,9 +9,11 @@ pub enum Op {
     AndImmediate{value: u8},
     Call{sub: u16},
     CallIf(Test, u16),
+    ExchangeDoubleWithHilo, 
     Jump{to: u16},
     JumpIf(Test, u16),
     LoadExtendedImmediate{to: Word, value: u16 },
+    Push(Word),
     Reset{vector: u8},
     ReturnIf(Test),
 }
@@ -117,7 +119,8 @@ mod b11111111 {
 #[disclose]
 #[allow(non_upper_case_globals)]
 mod b11_00_1111 {
-    const LoadExtendedImmediate: u8 = 0x01;
+    const LoadExtendedImmediate: u8 = 0b00_00_0001;
+    const Push: u8  = 0b11_00_0101;
 }
 
 #[disclose]
@@ -163,11 +166,16 @@ impl TryFrom<[u8;1]> for Op {
             let value = value[0];
             let value = match value & 0b11111111 {
                 b11111111::NoOp => return Ok(NOP(4)),
+                b11111111::ExchangeDoubleWithHilo => return Ok(ExchangeDoubleWithHilo),
                 _ => value
             };
-            let _value = match value & 0b11_000_111 {
+            let value = match value & 0b11_000_111 {
                 b11_000_111::Reset => return Ok(Reset{vector: value >> 3 & 0x07}),
                 b11_000_111::ReturnIf => return Ok(ReturnIf(Test::from(value))),
+                _ => value,
+            };
+            let _value = match value & 0b11_00_1111 {
+                b11_00_1111::Push => return Ok(Push(match Word::from(value) { Word::SP => Word::PSW, wide => wide})),
                 _ => value,
             };
         }
@@ -214,8 +222,13 @@ impl TryFrom<[u8;3]> for Op {
 impl Op {
     pub fn len(&self) -> u8 {
         match self {
-            Call{..} => 3,
-            _ => 1,
+            Call{..} | CallIf(..) | Jump{..} | JumpIf(..) | 
+            LoadExtendedImmediate{..} | ReturnIf(..) 
+                => 3,
+            AddImmediate{..} | AndImmediate{..} 
+                => 2,
+            NOP(..) | Push{..} | Reset{..} | ExchangeDoubleWithHilo
+                => 1,
         }
     }
 
@@ -294,5 +307,14 @@ mod test {
         assert_eq!(op.0, AddImmediate { value: 0x39 });
         let fail = Op::extract(&[0xC6]).unwrap_err();
         assert_eq!(fail, Error::Invalid([0xC6]));
+    }
+    
+    #[test]
+    fn push() {
+        let op = Op::extract(&[0xD5, 0xEB, 0x0E]).unwrap();
+        assert_eq!(op.1, 1);
+        assert_eq!(op.0, Push(Word::Wide(Double::DE)));
+        let op = Op::extract(&[0xF5, 0xB0]).unwrap();
+        assert_eq!(op.0, Push(Word::PSW));
     }
 }
