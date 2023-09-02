@@ -15,6 +15,12 @@ pub enum Register {
     M = 6,
 }
 
+impl Register {
+    pub fn use_bus(&self) -> bool {
+        *self == Self::M
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
 pub enum Double {
