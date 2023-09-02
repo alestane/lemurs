@@ -4,7 +4,7 @@ use super::{State, access::{*, Register::*, Double::*}};
 pub mod opcode;
 use opcode::{Op, Op::*};
 
-pub type Failure = Result<String, String>;
+pub type Failure = String;
 
 #[cfg(debug_assertions)]
 pub(super) type OpOutcome = Result<Option<NonZeroU8>, Failure>;
@@ -22,8 +22,9 @@ impl State<'_> {
         match outcome {
             Ok(Some(_)) => (),
             _ => self.active = false,
-        }
-        self.board.did_execute(self)?;
+        };
+        let me = self as *const State<'_>;
+        self.active = self.board.did_execute(unsafe{&*me})?;
         outcome
 	}
 
@@ -64,11 +65,11 @@ impl Op {
         let cycles = match self {
             AddImmediate { value } => {
                 let accumulator = &mut chip[Byte::Single(A)];
-                let aux = (*accumulator & 0x0F) + (value & 0x0F) > 0x0F;
-                let sign = (*accumulator | value) & 0x80;
-                *accumulator = accumulator.wrapping_add(value);
-                *chip.update_flags() = (sign != 0) && *accumulator & 0x80 == 0;
-                chip.a = aux;
+                let aux = *accumulator ^ value;
+                let (value, carry) = accumulator.overflowing_add(value);
+                *accumulator = value;
+                *chip.update_flags() = carry;
+                chip.a = (value ^ aux) & 0x10 != 0;
                 7
             }
             AndImmediate { value } => {
@@ -103,6 +104,10 @@ impl Op {
             LoadExtendedImmediate { to, value } => {
                 *chip <<= (to, value);
                 10
+            }
+            MoveImmediate { value, to } => {
+                chip[to] = value;
+                if to.use_bus() { 10 } else { 7 }
             }
             Push (source) => {
                 let source = source << &*chip;
@@ -273,5 +278,15 @@ mod test {
         ExchangeDoubleWithHilo.execute_on(&mut chip).unwrap();
         assert_eq!(Word::Wide(DE) << &chip, 0xD16C);
         assert_eq!(Word::Wide(HL) << &chip, 0x2B43);
+    }
+
+    #[test]
+    fn move_i() {
+        let mut env = SimpleBoard::default();
+        let mut chip = State::with(&mut env);
+        chip <<= (Word::Wide(HL), 0x0421);
+        MoveImmediate { value: 0x02, to: H }.execute_on(&mut chip).unwrap();
+        MoveImmediate { value: 0x72, to: M }.execute_on(&mut chip).unwrap();
+        assert_eq!(chip[0x0221], 0x72);
     }
 }

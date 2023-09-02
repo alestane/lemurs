@@ -19,15 +19,12 @@ fn exercise() {
     for outcome in sample {
         match outcome {
             Ok(duration) => cycles += usize::from(duration),
-            Err(Ok(txt)) => {
-                println!("Completed successfully!\n{txt}\n");
-                break;
-            }
-            Err(Err(txt)) => {
-                panic!("Stopped without completing.\n{txt}\n");
+            Err(txt) => {
+                panic!("Stopped without completing after {cycles} cycles.\n{txt}\n");
             }
         }
     };
 //    sample.map(usize::from).sum();
+    println!("Completed successfully.");
     println!("Total of {cycles} cycles executed.")
 }

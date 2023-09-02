@@ -1,6 +1,6 @@
 use core::fmt::UpperHex;
 
-use crate::{convert::TryFrom, chip::access::{Word, Double}};
+use crate::{convert::TryFrom, chip::access::{Byte, Register, Word, Double}};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Op {
@@ -13,6 +13,7 @@ pub enum Op {
     Jump{to: u16},
     JumpIf(Test, u16),
     LoadExtendedImmediate{to: Word, value: u16 },
+    MoveImmediate{value: u8, to: Register},
     Push(Word),
     Reset{vector: u8},
     ReturnIf(Test),
@@ -28,6 +29,28 @@ impl From<u8> for Word {
             0b00_11_0000 => Word::SP,
             _ => unreachable!(),
         }
+    }
+}
+
+impl From<u8> for Register {
+    fn from(value: u8) -> Self {
+        match value & 0b00_111_000 {
+            0b00_000_000 => Register::B,
+            0b00_001_000 => Register::C,
+            0b00_010_000 => Register::D,
+            0b00_011_000 => Register::E,
+            0b00_100_000 => Register::H,
+            0b00_101_000 => Register::L,
+            0b00_110_000 => Register::M,
+            0b00_111_000 => Register::A,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl Register {
+    fn split(value: u8) -> (Self, Self) {
+        (Self::from(value), Self::from(value << 3))
     }
 }
 
@@ -66,7 +89,7 @@ impl Test {
 }
 
 impl From<u8> for Test {
-fn from(value: u8) -> Self {
+    fn from(value: u8) -> Self {
         let test = match (value & 0b00_11_0_000) >> 4 {
             0b00 => Zero,
             0b01 => Carry,
@@ -130,6 +153,7 @@ mod b11_000_111 {
     const Reset: u8 = 0b11_000_111;
     const ReturnIf: u8 = 0b11_000_000;
     const CallIf: u8 = 0b11_000_100;
+    const MoveImmediate: u8 = 0b00_000_110;
 }
 
 pub struct OutOfRange;
@@ -187,10 +211,14 @@ impl TryFrom<[u8;2]> for Op {
     type Error = [u8;2];
     fn try_from(value: [u8;2]) -> Result<Self, Self::Error> {
         let [action, data] = value;
-        let _action = match action {
+        let action = match action {
             b11111111::AddImmediate => return Ok(AddImmediate { value: data }),
             b11111111::AndImmediate => return Ok(AndImmediate { value: data }),
-            next => next,
+            _next => action,
+        };
+        let _action = match action & 0b11_000_111 {
+            b11_000_111::MoveImmediate => return Ok(MoveImmediate{ value: data, to: Register::from(action) }),
+            _next => action,
         };
         Err(value)
     }
@@ -225,7 +253,7 @@ impl Op {
             Call{..} | CallIf(..) | Jump{..} | JumpIf(..) | 
             LoadExtendedImmediate{..} | ReturnIf(..) 
                 => 3,
-            AddImmediate{..} | AndImmediate{..} 
+            AddImmediate{..} | AndImmediate{..} | MoveImmediate{..}
                 => 2,
             NOP(..) | Push{..} | Reset{..} | ExchangeDoubleWithHilo
                 => 1,
@@ -316,5 +344,14 @@ mod test {
         assert_eq!(op.0, Push(Word::Wide(Double::DE)));
         let op = Op::extract(&[0xF5, 0xB0]).unwrap();
         assert_eq!(op.0, Push(Word::PSW));
+    }
+
+    #[test]
+    fn move_i() {
+        let op = Op::extract(&[0x0E, 0x09, 0xCD]).unwrap();
+        assert_eq!(op.1, 2);
+        assert_eq!(op.0, MoveImmediate { value: 0x09, to: Register::C });
+        let fail = Op::extract(&[0x26]).unwrap_err();
+        assert_eq!(fail, Error::Invalid([0x26]));
     }
 }

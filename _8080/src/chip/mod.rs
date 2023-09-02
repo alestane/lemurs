@@ -77,7 +77,7 @@ impl<'a> State<'a> {
 
 #[cfg(debug_assertions)]
 impl Iterator for State<'_> {
-	type Item = Result<u8, Result<String, String>>;	
+	type Item = Result<u8, String>;	
 	fn next(&mut self) -> Option<Self::Item> {
 		let result = self.execute();
 		match result {

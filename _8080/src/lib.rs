@@ -31,7 +31,7 @@ pub trait Harness : IndexMut<u16, Output = u8> + Deref<Target=[u8]> {
 	fn input(&mut self, port: u8) -> u8;
 	fn output(&mut self, port: u8, value: u8);
     #[cfg(debug_assertions)]
-    fn did_execute(&self, _client: &State) -> Result<(), Result<String, String>> { Ok( () )}
+    fn did_execute(&mut self, _client: &State) -> Result<bool, String> { Ok( true )}
 }
 
 pub struct SimpleBoard {
