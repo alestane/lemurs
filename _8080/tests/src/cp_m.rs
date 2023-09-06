@@ -1,13 +1,16 @@
 extern crate _8080;
 
-use _8080::{Harness, support::*};
+use _8080::{Harness, support::*, op};
 use core::ops::{Deref, Index, IndexMut};
+use std::collections::HashSet;
 
 #[allow(non_camel_case_types)]
 pub struct CP_M {
     dead: u8,
     ram: [u8;0x10000],
     port: [u8;256],
+    history: std::collections::HashSet<u16>,
+    order: Vec<u16>,
 }
 
 impl CP_M {
@@ -16,6 +19,8 @@ impl CP_M {
             dead: 0,
             ram: [0;_],
             port: [0;_],
+            history: HashSet::new(),
+            order: vec!()
         };
         [new.ram[0], new.ram[1], new.ram[2]] = [0xC3, 0x00, 0x01];
         let mut ram = &mut new.ram[0x100..];
@@ -50,9 +55,16 @@ impl Harness for CP_M {
     fn write(&mut self, value: u8, to: u16) { if (0x100..).contains(&to) { self.ram[to as usize] = value; } }
     fn input(&mut self, port: u8) -> u8 { self.port[port as usize] }
     fn output(&mut self, port: u8, value: u8) { self.port[port as usize] = value; }
-    fn did_execute(&mut self, client: &_8080::State) -> Result<bool, String> {
+    fn did_execute(&mut self, client: &_8080::State) -> Result<Option<op::Op>, String> {
+        if self.history.contains(&client.pc) {
+            self.order.push(client.pc);
+            eprintln!("{:#?}", self.order);
+            return Err(format!("Repeated instruction at {}", client.pc));
+        } else {
+            self.history.insert(client.pc);
+        }
         match client.pc {
-            0 => return (self.dead != 0).then_some(false).ok_or(String::from("Failed tests")),
+            0 => return (self.dead != 0).then_some(Some(op::Halt)).ok_or(String::from("Failed tests")),
             5 => { 
                 let offset = client[Double::DE];
                 match client[Register::C] {
@@ -67,6 +79,7 @@ impl Harness for CP_M {
                     }
                     _ => (),
                 };
+                return Ok(Some(op::Return));
             }
             0x0689 => {
                 let (a, cy, _ac, pe, m, z) = (client.register[6], client.c as u8, client.a as u8, client.p as u8, client.m as u8, client.z as u8);
@@ -77,6 +90,6 @@ impl Harness for CP_M {
             }
             _ => (),
         };
-        Ok (true)
+        Ok ( None )
     }
 }
