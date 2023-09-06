@@ -24,7 +24,9 @@ impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
             Ok(Some(_)) => (),
             _ => self.chip.active = false,
         };
-        self.chip.active = self.board.did_execute(&self.chip)?;
+        if let Some(action) = self.board.did_execute(&self.chip)? {
+            action.execute_on(&mut self.chip, self.board.deref_mut()).unwrap();
+        }
         outcome
 	}
 
@@ -95,9 +97,12 @@ impl Op {
                 7
             }
             ExchangeDoubleWithHilo => {
-                let reg = &mut chip.register;
-                (reg[2], reg[3], reg[4], reg[5]) = (reg[4], reg[5], reg[2], reg[3]);
+                (chip[Double::DE], chip[Double::HL]) = (chip[Double::HL], chip[Double::DE]);
                 5
+            }
+            Halt => {
+                chip.active = false;
+                7
             }
             Jump{to} => {
                 chip.pc = to;
@@ -132,9 +137,13 @@ impl Op {
                 chip.pc = vector as u16 * 8;
                 11
             }
+            Return => {
+                chip.pc = bus.read_word(chip.pop());
+                10
+            }
             ReturnIf(test) => {
                 if test.approves(chip) {
-                    chip.pc = bus.read_word(chip.pop());
+                    Return.execute_on(chip, bus)?;
                     11
                 } else {
                     5
@@ -246,6 +255,17 @@ mod test {
     }
 
     #[test]
+    fn halt() {
+        let mut env = Socket::default();
+        let mut chip = State::new();
+        chip.pc = 0x2534;
+        chip.pc += Halt.len() as u16;
+        Halt.execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip.pc, 0x2535);
+        assert!(!chip.active, "Processor not stopped");
+    }
+
+    #[test]
     fn jump() {
         let mut env = Socket::default();
         let mut chip = State::new();
@@ -301,6 +321,18 @@ mod test {
         assert_eq!(chip.sp, 0x01FE);
         assert_eq!(env[0x01FE], 0x91);
         assert_eq!(env[0x01FF], 0x03);
+    }
+
+    #[test]
+    fn return_from() {
+        let mut env = SimpleBoard::default();
+        let mut chip = State::new();
+        chip.pc = 0x02B6;
+        chip.sp = 0x8EA5;
+        [env[0x8EA5], env[0x8EA6]] = [0xFE,0x01];
+        Return.execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip.sp, 0x8EA7);
+        assert_eq!(chip.pc, 0x01FE);
     }
 
     #[test]

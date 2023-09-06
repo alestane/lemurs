@@ -28,6 +28,19 @@ mod chip;
 use crate::ops::{Deref, DerefMut, Index, IndexMut, Range, RangeFull, RangeFrom, RangeTo, RangeToInclusive};
 pub use core::result::Result;
 
+pub use chip::State;
+
+#[cfg(debug_assertions)]
+pub mod support {
+    use super::*;
+    pub use chip::Socket;
+    pub use chip::access::*;
+}
+
+pub mod op {
+    pub use super::chip::opcode::{Op::{self, *}, Flag::*, Test::*};
+}
+
 pub trait Harness {
     fn read(&self, from: u16) -> u8;
     fn read_word(&self, from: u16) -> u16 {
@@ -42,7 +55,7 @@ pub trait Harness {
 	fn input(&mut self, port: u8) -> u8;
 	fn output(&mut self, port: u8, value: u8);
     #[cfg(debug_assertions)]
-    fn did_execute(&mut self, _client: &State) -> Result<bool, String> { Ok( true )}
+    fn did_execute(&mut self, _client: &State) -> Result<Option<op::Op>, String> { Ok( None )}
 }
 
 pub struct SimpleBoard {
@@ -137,17 +150,6 @@ impl IndexMut<RangeFull> for SimpleBoard {
     fn index_mut(&mut self, _index: RangeFull) -> &mut Self::Output { &mut self.ram[..] }
 }
 
-#[cfg(debug_assertions)]
-pub mod support {
-    use super::*;
-    pub use chip::Socket;
-    pub use chip::access::*;
-}
-
-pub mod op {
-    pub use super::chip::opcode::{Op::{self, *}, Flag::*, Test::*};
-}
-
 pub struct Machine<H: Harness, C: DerefMut<Target = H>> {
     board: C,
     chip: State,
@@ -167,5 +169,3 @@ impl<H: Harness, C: DerefMut<Target = H>> Deref for Machine<H, C> {
 impl<H: Harness, C: DerefMut<Target = H>> DerefMut for Machine<H, C> {
     fn deref_mut(&mut self) -> &mut Self::Target { &mut self.chip }
 }
-
-pub use chip::State;

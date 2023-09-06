@@ -11,12 +11,14 @@ pub enum Op {
     CallIf(Test, u16),
     CompareWith{ value: u8 },
     ExchangeDoubleWithHilo, 
+    Halt,
     Jump{to: u16},
     JumpIf(Test, u16),
     LoadExtendedWith{to: Internal, value: u16 },
     MoveData{value: u8, to: Byte},
     Push(Word),
     Reset{vector: u8},
+    Return,
     ReturnIf(Test),
 }
 use Op::*;
@@ -189,6 +191,8 @@ impl TryFrom<[u8;1]> for Op {
             let value = match value & 0b11111111 {
                 b11111111::NoOp => return Ok(NOP(4)),
                 b11111111::ExchangeDoubleWithHilo => return Ok(ExchangeDoubleWithHilo),
+                b11111111::Halt => return Ok(Halt),
+                b11111111::Return => return Ok(Return),
                 _ => value
             };
             let value = match value & 0b11_000_111 {
@@ -254,7 +258,7 @@ impl Op {
                 => 3,
             AddTo{..} | AndWith{..} | CompareWith{..} | MoveData{..}
                 => 2,
-            NOP(..) | Push{..} | Reset{..} | ExchangeDoubleWithHilo
+            NOP(..) | Push{..} | Reset{..} | ExchangeDoubleWithHilo | Return | Halt
                 => 1,
         }
     }
@@ -310,6 +314,12 @@ mod test {
     }
 
     #[test]
+    fn return_() {
+        let op = decode(&[0xC9, 0x31, 0x00]).unwrap();
+        assert_eq!(op.0, Return);
+    }
+
+    #[test]
     fn return_if() {
         let op = decode(&[0xD8]).unwrap();
         assert_eq!(op.0, ReturnIf(Is(Carry)));
@@ -323,6 +333,12 @@ mod test {
         assert_eq!(op.0, LoadExtendedWith { to: Internal::StackPointer, value: 549 });
         let fail = decode(&[0x11, 0x21]).unwrap_err();
         assert_eq!(fail, Error::InvalidPair([0x11, 0x21]));
+    }
+
+    #[test]
+    fn halt() {
+        let op = decode(&[0x76]).unwrap();
+        assert_eq!(op.0, Halt);
     }
 
     #[test]
