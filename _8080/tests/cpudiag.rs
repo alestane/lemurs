@@ -1,7 +1,7 @@
 #![feature(generic_arg_infer)]
 
 extern crate _8080;
-use _8080::State;
+use _8080::Machine;
 
 mod src {
     pub mod cp_m;
@@ -11,10 +11,11 @@ use src::*;
 #[cfg(debug_assertions)]
 #[test]
 fn exercise() {
+
     println!("currently at {}", std::env::current_dir().unwrap().display());
     let body = std::fs::read("tests/cpudiag.bin").expect("Couldn't load test file.");
     let mut machine = cp_m::CP_M::with_program(&body);
-    let sample = State::with(&mut machine);
+    let sample = Machine::new(&mut machine);
     let mut cycles = 0usize;
     for outcome in sample {
         match outcome {

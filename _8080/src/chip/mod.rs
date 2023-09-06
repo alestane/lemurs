@@ -4,7 +4,7 @@ pub use execution::opcode;
 
 use core::cell::UnsafeCell;
 
-use crate::{String, Harness, ops::{Deref, Index,IndexMut}};
+use crate::{Harness, ops::{Deref, DerefMut, Index, IndexMut}, Machine};
 
 #[cfg(not(debug_assertions))]
 pub(self) mod access;
@@ -43,41 +43,37 @@ impl Deref for Socket {
 }
 
 impl Harness for Socket {
+	fn read(&self, from: u16) -> u8 { let _ = from; 0 }
+	fn read_word(&self, from: u16) -> u16 { let _ = from; 0 }
 	fn input(&mut self, _port: u8) -> u8 { 0 }
 	fn output(&mut self, _port: u8, _value: u8) { }
 }
 
 #[cfg_attr(debug_assertions, disclose)]
-pub struct State<'a> {
-	board: &'a mut dyn Harness,
+pub struct State {
+	pc: u16,
+	sp: u16,
 	register: [u8;7],
 	c: bool, a: bool, p: bool, m: bool, z: bool,
 	active: bool, interrupts: bool,
-	pc: u16,
-	sp: u16,
 }
 
 pub use access::Byte;
 
-impl<'a> State<'a> {
-	pub fn with(board: &'a mut dyn Harness) -> Self {
+impl State {
+	pub fn new() -> Self {
 		Self {
-			board: board, 
 			register: [0;7], 
 			c: false, a: false, p: false, m: false, z: false, 
 			active: true, interrupts: false, 
 			pc: 0, sp: 0, 
 		}
 	}
-
-	pub fn embed(&mut self, board: &'a mut dyn Harness) {
-		self.board = board;
-	}
 }
 
 #[cfg(debug_assertions)]
-impl Iterator for State<'_> {
-	type Item = Result<u8, String>;	
+impl<H: Harness, C: DerefMut<Target = H>> Iterator for Machine<H, C> {
+	type Item = Result<u8, crate::String>;	
 	fn next(&mut self) -> Option<Self::Item> {
 		let result = self.execute();
 		match result {
@@ -89,9 +85,10 @@ impl Iterator for State<'_> {
 }
 
 #[cfg(not(debug_assertions))]
-impl Iterator for State<'_> {
+impl<H: Harness, C: DerefMut<Target = H>> Iterator for Machine<H, C> {
 	type Item = u8;
 	fn next(&mut self) -> Option<Self::Item> {
+		use core::num::NonZeroU8;
 		self.execute().map(NonZeroU8::get)
 	}
 }

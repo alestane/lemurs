@@ -1,23 +1,37 @@
-use core::ops::{Shl, ShlAssign, Index, IndexMut};
+use core::{ops::{Shl, ShlAssign, Index, IndexMut, DerefMut}, mem};
 
-use super::State;
+use crate::{State, Machine, Harness};
 
+#[cfg(target_endian="little")]
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
 pub enum Register {
-    A = 7,
+    A = 6,
     B = 1,
     C = 0,
     D = 3,
     E = 2, 
     H = 5,
     L = 4,
-    M = 6,
 }
 
-impl Register {
+#[cfg(target_endian="big")]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(u8)]
+pub enum Register {
+    A = 6,
+    B = 0,
+    C = 1,
+    D = 2,
+    E = 3, 
+    H = 4,
+    L = 5,
+}
+
+
+impl Byte {
     pub fn use_bus(&self) -> bool {
-        *self == Self::M
+        match self { Byte::Indirect | Byte::RAM(_) => true, _ => false }
     }
 }
 
@@ -29,26 +43,34 @@ pub enum Double {
     HL = 2,
 }
 
-use self::{Register::*, Double::*};
+use self::{Register as R, Double as D, Internal as I, Word as W};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Byte {
     Single(Register),
+    Indirect,
     RAM(u16),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Word {
+pub enum Internal {
     Wide(Double),
-    PSW,
-    SP,
+    ProgramCounter,
+    StackPointer,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Word {
+    OnBoard(Internal),
+    ProgramStatus,
     RAM(u16),
     Stack,
     Indirect,
 }
 
-impl State<'_> {
-    pub fn flags(&self) -> u8 {
+#[disclose(super)]
+impl State {
+    fn flags(&self) -> u8 {
         self.c as u8 | 
         0b10u8 |
         (self.p as u8) << 2 |
@@ -56,7 +78,7 @@ impl State<'_> {
         (self.z as u8) << 6 |
         (self.m as u8) << 7
     }
-    pub fn extract_flags(&mut self, bits: u8) {
+    fn extract_flags(&mut self, bits: u8) {
         (self.c, self.p, self.a, self.z, self.m) = (
             bits & 0b00000001 != 0, 
             bits & 0b00000100 != 0,
@@ -65,7 +87,7 @@ impl State<'_> {
             bits & 0b10000000 != 0,
         );
     }
-    pub fn update_flags(&mut self) -> &mut bool {
+    fn update_flags(&mut self) -> &mut bool {
         let accumulator = self.register[6];
         let mut parity = accumulator;
         for offset in [4, 2, 1] {
@@ -77,137 +99,135 @@ impl State<'_> {
         self.a = false;
         &mut self.c
     }
-}
-
-impl Index<u16> for State<'_> {
-    type Output = u8;
-    fn index(&self, i: u16) -> &Self::Output {
-        &self.board[i]
+    fn status(&self) -> u16 {
+        u16::from_le_bytes([self[Register::A], self.flags()])
     }
-}
 
-impl IndexMut<u16> for State<'_> {
-    fn index_mut(&mut self, i: u16) -> &mut Self::Output {
-        &mut self.board[i]
+    fn push(&mut self) -> u16 {
+        self.sp -= 2;
+        self.sp
     }
-}
 
-impl Index<Register> for State<'_> {
-    type Output = u8;
-    fn index(&self, index: Register) -> &Self::Output {
-        match index {
-            M => &self[Word::Wide(HL) << self],
-            A => &self.register[6],
-            index => &self.register[index as usize],
+    fn pop(&mut self) -> u16 {
+        let address = self.sp;
+        self.sp += 2;
+        address
+    }
+
+    fn resolve_byte(&self, target: Byte) -> Byte {
+        match target {
+            Byte::Indirect => Byte::RAM(self[D::HL]),
+            _ => target
+        }
+    }
+    fn resolve_word(&self, target: Word) -> Word {
+        match target {
+            Word::Indirect => Word::RAM(self[D::HL]),
+            _ => target
         }
     }
 }
 
-impl IndexMut<Register> for State<'_> {
-    fn index_mut(&mut self, index: Register) -> &mut Self::Output {
+impl Index<Register> for State {
+    type Output = u8;
+    fn index(&self, index: Register) -> &Self::Output { &self.register[index as usize] }
+}
+
+impl IndexMut<Register> for State {
+    fn index_mut(&mut self, index: Register) -> &mut Self::Output { &mut self.register[index as usize] }
+}
+
+impl Index<Double> for State {
+    type Output = u16;
+    fn index(&self, index: Double) -> &Self::Output {
+        let index = 2 * index as u8;
+        unsafe{ mem::transmute::<&u8, &Self::Output>(&self.register[index as usize]) }
+    }
+}
+
+impl IndexMut<Double> for State {
+    fn index_mut(&mut self, index: Double) -> &mut Self::Output {
+        let index = 2 * index as u8;
+        unsafe{ mem::transmute::<&mut u8, &mut Self::Output>(&mut self.register[index as usize]) }
+    }
+}
+
+impl Index<Internal> for State {
+    type Output = u16;
+    fn index(&self, index: Internal) -> &Self::Output {
         match index {
-            M => {
-                let addr = Word::Wide(HL) << &*self;
-                &mut self[addr]
-            }
-            A => &mut self.register[6],
-            index => &mut self.register[index as usize],
+            I::Wide(pair) => &self[pair],
+            I::ProgramCounter => &self.pc,
+            I::StackPointer => &self.sp,
         }
     }
 }
 
-impl Index<Byte> for State<'_> {
-	type Output = u8;
-	fn index(&self, i: Byte) -> &Self::Output {
-        use Byte::*;
-		match i {
-            Single(index) => &self[index],
-            RAM(i) => &self[i],
-		}
-	}
-}
-
-impl IndexMut<Byte> for State<'_> {
-	fn index_mut(&mut self, i: Byte) -> &mut Self::Output {
-        use Byte::*;
-		match i {
-            Single(index) => &mut self[index],
-            RAM(i) => &mut self[i],
-		}
-	}
-}
-
-impl Shl<&State<'_>> for u16 {
-    type Output = u16;
-    fn shl(self, chip: &State) -> Self::Output {
-        u16::from_le_bytes([chip[self], chip[self + 1]])
+impl IndexMut<Internal> for State {
+    fn index_mut(&mut self, index: Internal) -> &mut Self::Output {
+        match index {
+            I::Wide(pair) => &mut self[pair],
+            I::ProgramCounter => &mut self.pc,
+            I::StackPointer => &mut self.sp,
+        }
     }
 }
 
-impl Shl<&State<'_>> for Double {
+impl<H: Harness, C: DerefMut<Target = H>> Shl<&Machine<H, C>> for u16 {
     type Output = u16;
-    fn shl(self, chip: &State) -> Self::Output {
-        let index = 2 * self as usize;
-        u16::from_le_bytes([chip.register[index], chip.register[index + 1]])
+    fn shl(self, host: &Machine<H, C>) -> Self::Output {
+        host.board.read_word(self)
     }
 }
 
-impl Shl<&State<'_>> for Word {
+impl<H: Harness, C: DerefMut<Target = H>> Shl<&Machine<H, C>> for Word {
     type Output = u16;
-    fn shl(self, chip: &State) -> Self::Output {
-        use Word::*;
+    fn shl(self, host: &Machine<H, C>) -> Self::Output {
         match self {
-            Wide(pair) => pair << chip,
-            PSW => u16::from_le_bytes([chip.register[6], chip.flags()]),
-            SP => chip.sp,
-            RAM(i) => i << chip,
-            Stack => panic!("Can't pop from stack without mutate access"),
-            Indirect => (HL << chip) << chip
+            Self::OnBoard(internal) => host.chip[internal],
+            Self::ProgramStatus => u16::from_le_bytes([host.chip.register[6], host.chip.flags()]),
+            Self::RAM(i) => host.board.read_word(i),
+            Self::Stack => panic!("Can't pop from stack without mutate access"),
+            Self::Indirect => host.board.read_word(host.chip[D::HL]),
         }
     }
 }
 
-impl Shl<&mut State<'_>> for Word {
+impl<H: Harness, C: DerefMut<Target = H>> Shl<&mut Machine<H, C>> for Word {
     type Output = u16;
-    fn shl(self, chip: &mut State) -> Self::Output {
+    fn shl(self, host: &mut Machine<H, C>) -> Self::Output {
         match self {
             Word::Stack => {
-                let addr = chip.sp;
-                chip.sp += 2;
-                addr << &*chip
+                let addr = host.chip.sp;
+                host.chip.sp += 2;
+                host.board.read_word(addr)
             }
-            _ => self << &*chip,
+            _ => self << &*host,
         }
     }
 }
 
-impl ShlAssign<(u16, u16)> for State<'_> {
-    fn shl_assign(&mut self, (idx, val): (u16, u16)) {
-        [self[idx], self[idx+ 1]] = val.to_le_bytes();
+impl<H: Harness, C: DerefMut<Target = H>> ShlAssign<(u16, u16)> for Machine<H, C> {
+    fn shl_assign(&mut self, (index, value): (u16, u16)) {
+        self.board.write_word(value, index);
     }
 }
 
-impl ShlAssign<(Double, u16)> for State<'_> {
-    fn shl_assign(&mut self, (pair, value): (Double, u16)) {
-        let index = 2 * pair as usize;
-        [self.register[index], self.register[index + 1]] = value.to_le_bytes();
-    }
-}
-
-impl ShlAssign<(Word, u16)> for State<'_> {
-    fn shl_assign(&mut self, (target, val): (Word, u16)) {
-        use Word::*;
-        match target {
-            Wide(pair) => *self <<= (pair, val),
-            PSW => {
-                let [a, flags] = val.to_le_bytes();
-                self.register[6] = a;
-                self.extract_flags(flags);
+impl<H: Harness, C: DerefMut<Target = H>> ShlAssign<(Word, u16)> for Machine<H, C> {
+    fn shl_assign(&mut self, (index, value): (Word, u16)) {
+        match index {
+            W::OnBoard(internal) => self.chip[internal] = value,
+            W::Indirect => self.board.write_word(value, self.chip[I::Wide(D::HL)]),
+            W::RAM(address) => self.board.write_word(value, address),
+            W::ProgramStatus => {
+                let [a, f] = value.to_le_bytes();
+                self.chip[R::A] = a;
+                self.chip.extract_flags(f);
             }
-            SP => self.sp = val,
-            RAM(i) => *self <<= (i, val),
-            Stack => { self.sp -= 2; *self <<= (self.sp, val) },
-            Indirect => *self <<= (HL << &*self, val),
-        };
+            W::Stack => {
+                self.chip.sp -= 2;
+                self.board.write_word(value, self.chip.sp);
+            }
+        }
     }
 }

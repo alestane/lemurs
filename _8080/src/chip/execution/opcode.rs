@@ -1,6 +1,6 @@
 use core::fmt::UpperHex;
 
-use crate::{convert::TryFrom, chip::access::{Byte, Register, Word, Double}};
+use crate::{convert::TryFrom, chip::access::{Byte, Register, Word, Double, Internal}};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Op {
@@ -12,43 +12,43 @@ pub enum Op {
     ExchangeDoubleWithHilo, 
     Jump{to: u16},
     JumpIf(Test, u16),
-    LoadExtendedImmediate{to: Word, value: u16 },
-    MoveImmediate{value: u8, to: Register},
+    LoadExtendedImmediate{to: Internal, value: u16 },
+    MoveImmediate{value: u8, to: Byte},
     Push(Word),
     Reset{vector: u8},
     ReturnIf(Test),
 }
 use Op::*;
 
-impl From<u8> for Word {
+impl From<u8> for Internal {
     fn from(value: u8) -> Self {
         match value & 0b00_11_0000 {
-            0b00_00_0000 => Word::Wide(Double::BC),
-            0b00_01_0000 => Word::Wide(Double::DE),
-            0b00_10_0000 => Word::Wide(Double::HL),
-            0b00_11_0000 => Word::SP,
+            0b00_00_0000 => Internal::Wide(Double::BC),
+            0b00_01_0000 => Internal::Wide(Double::DE),
+            0b00_10_0000 => Internal::Wide(Double::HL),
+            0b00_11_0000 => Internal::StackPointer,
             _ => unreachable!(),
         }
     }
 }
 
-impl From<u8> for Register {
+impl From<u8> for Byte {
     fn from(value: u8) -> Self {
         match value & 0b00_111_000 {
-            0b00_000_000 => Register::B,
-            0b00_001_000 => Register::C,
-            0b00_010_000 => Register::D,
-            0b00_011_000 => Register::E,
-            0b00_100_000 => Register::H,
-            0b00_101_000 => Register::L,
-            0b00_110_000 => Register::M,
-            0b00_111_000 => Register::A,
+            0b00_000_000 => Byte::Single(Register::B),
+            0b00_001_000 => Byte::Single(Register::C),
+            0b00_010_000 => Byte::Single(Register::D),
+            0b00_011_000 => Byte::Single(Register::E),
+            0b00_100_000 => Byte::Single(Register::H),
+            0b00_101_000 => Byte::Single(Register::L),
+            0b00_110_000 => Byte::Indirect,
+            0b00_111_000 => Byte::Single(Register::A),
             _ => unreachable!(),
         }
     }
 }
 
-impl Register {
+impl Byte {
     fn split(value: u8) -> (Self, Self) {
         (Self::from(value), Self::from(value << 3))
     }
@@ -179,10 +179,6 @@ impl UpperHex for Error {
     }
 }
 
-mod build {
-    pub type Result = crate::Result<(super::Op, usize), super::Error>;
-}
-
 impl TryFrom<[u8;1]> for Op {
     type Error = [u8;1];
     fn try_from(value: [u8;1]) -> Result<Self, Self::Error> {
@@ -199,7 +195,7 @@ impl TryFrom<[u8;1]> for Op {
                 _ => value,
             };
             let _value = match value & 0b11_00_1111 {
-                b11_00_1111::Push => return Ok(Push(match Word::from(value) { Word::SP => Word::PSW, wide => wide})),
+                b11_00_1111::Push => return Ok(Push(match Internal::from(value) { Internal::StackPointer => Word::ProgramStatus, wide => Word::OnBoard(wide)})),
                 _ => value,
             };
         }
@@ -217,7 +213,7 @@ impl TryFrom<[u8;2]> for Op {
             _next => action,
         };
         let _action = match action & 0b11_000_111 {
-            b11_000_111::MoveImmediate => return Ok(MoveImmediate{ value: data, to: Register::from(action) }),
+            b11_000_111::MoveImmediate => return Ok(MoveImmediate{ value: data, to: Byte::from(action) }),
             _next => action,
         };
         Err(value)
@@ -235,7 +231,7 @@ impl TryFrom<[u8;3]> for Op {
             _ => action,
         };
         match action & 0b11_00_1111 {
-            b11_00_1111::LoadExtendedImmediate => return Ok(LoadExtendedImmediate { to: Word::from(action), value: data }),
+            b11_00_1111::LoadExtendedImmediate => return Ok(LoadExtendedImmediate { to: Internal::from(action), value: data }),
             _ => action,
         };
         match action & 0b11_000_111 {
@@ -260,17 +256,16 @@ impl Op {
         }
     }
 
-    pub fn extract(value: &[u8]) -> build::Result {
-        let mut bytes = value.iter().copied();
-        let code = match Op::try_from([bytes.next().ok_or(Error::NoData)?]) {
+    pub fn extract<H: crate::Harness>(bus: &H, start: u16) -> Result<(Op, usize), self::Error> {
+        let code = match Op::try_from([bus.read(start)]) {
             Ok(op) => return Ok((op, 1)),
             Err(code) => code,
         };
-        let code = match Op::try_from([code[0], bytes.next().ok_or(Error::Invalid(code))?]) {
+        let code = match Op::try_from([code[0], bus.read(start.wrapping_add(1))]) {
             Ok(op) => return Ok((op, 2)),
             Err(code) => code,
         };
-        match Op::try_from([code[0], code[1], bytes.next().ok_or(Error::InvalidPair(code))?]) {
+        match Op::try_from([code[0], code[1], bus.read(start.wrapping_add(2))]) {
             Ok(op) => Ok((op, 3)),
             Err(code) => Err(Error::InvalidTriple(code))
         }
@@ -279,79 +274,97 @@ impl Op {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use super::*;    
+    
+    fn decode(value: &[u8]) -> crate::Result<(Op, usize), self::Error> {
+        if value.len() < 1 { return Err(self::Error::NoData); }
+        let code = match Op::try_from([value[0]]) {
+            Ok(op) => return Ok( (op, 1) ),
+            Err(code) => code,
+        };
+        if value.len() < 2 { return Err(self::Error::Invalid(code)); }
+        let code = match Op::try_from([code[0], value[1]]) {
+            Ok(op) => return Ok( (op, 2) ),
+            Err(code) => code,
+        };
+        if value.len() < 3 { return Err(Error::InvalidPair(code)); }
+        match Op::try_from([code[0], code[1], value[2]]) {
+            Ok(op) => Ok( (op, 3) ),
+            Err(code) => Err(self::Error::InvalidTriple(code))
+        } 
+    }
 
     #[test]
     fn no_op() {
-        let op = Op::extract(&[0x00]).unwrap();
+        let op = decode(&[0x00]).unwrap();
         assert_eq!(op.0, NOP(4));
     }
 
     #[test]
     fn reset_from_val() {
-        let op = Op::extract(&[0xD7]).unwrap();
+        let op = decode(&[0xD7]).unwrap();
         assert_eq!(op.0, Reset{vector: 2});
     }
 
     #[test]
     fn return_if() {
-        let op = Op::extract(&[0xD8]).unwrap();
+        let op = decode(&[0xD8]).unwrap();
         assert_eq!(op.0, ReturnIf(Is(Carry)));
-        let op = Op::extract(&[0xF0]).unwrap();
+        let op = decode(&[0xF0]).unwrap();
         assert_eq!(op.0, ReturnIf(Not(Negative)));
     }
 
     #[test]
     fn load_xi() {
-        let op = Op::extract(&[0x31, 0x25, 0x02]).unwrap();
-        assert_eq!(op.0, LoadExtendedImmediate { to: Word::SP, value: 549 });
-        let fail = Op::extract(&[0x11, 0x21]).unwrap_err();
+        let op = decode(&[0x31, 0x25, 0x02]).unwrap();
+        assert_eq!(op.0, LoadExtendedImmediate { to: Internal::StackPointer, value: 549 });
+        let fail = decode(&[0x11, 0x21]).unwrap_err();
         assert_eq!(fail, Error::InvalidPair([0x11, 0x21]));
     }
 
     #[test]
     fn jump() {
-        let op = Op::extract(&[0xC3, 0x74, 0x31]).unwrap();
+        let op = decode(&[0xC3, 0x74, 0x31]).unwrap();
         assert_eq!(op.0, Jump { to: 0x3174 });
-        let op = Op::extract(&[0xF2, 0x31, 0x4A]).unwrap();
+        let op = decode(&[0xF2, 0x31, 0x4A]).unwrap();
         assert_eq!(op.0, JumpIf(Not(Negative), 0x4A31));
-        let fail = Op::extract(&[0xFA]).unwrap_err();
+        let fail = decode(&[0xFA]).unwrap_err();
         assert_eq!(fail, Error::Invalid([0xFA]));
     }
 
     #[test]
     fn call() {
-        let op = Op::extract(&[0xCD, 0xD3, 0x08]).unwrap();
+        let op = decode(&[0xCD, 0xD3, 0x08]).unwrap();
         assert_eq!(op.0, Call { sub: 0x08D3 });
-        let op = Op::extract(&[0xE4, 0x4B, 0x03]).unwrap();
+        let op = decode(&[0xE4, 0x4B, 0x03]).unwrap();
         assert_eq!(op.0, CallIf(Not(EvenParity), 0x034B));
-        let fail = Op::extract(&[0xD2, 0x07]).unwrap_err();
+        let fail = decode(&[0xD2, 0x07]).unwrap_err();
         assert_eq!(fail, Error::InvalidPair([0xD2, 0x07]));
     }
 
     #[test]
     fn adi() {
-        let op = Op::extract(&[0xC6, 0x39, 0x02]).unwrap();
+        let op = decode(&[0xC6, 0x39, 0x02]).unwrap();
         assert_eq!(op.0, AddImmediate { value: 0x39 });
-        let fail = Op::extract(&[0xC6]).unwrap_err();
+        let fail = decode(&[0xC6]).unwrap_err();
         assert_eq!(fail, Error::Invalid([0xC6]));
     }
     
     #[test]
     fn push() {
-        let op = Op::extract(&[0xD5, 0xEB, 0x0E]).unwrap();
+        let op = decode(&[0xD5, 0xEB, 0x0E]).unwrap();
         assert_eq!(op.1, 1);
-        assert_eq!(op.0, Push(Word::Wide(Double::DE)));
-        let op = Op::extract(&[0xF5, 0xB0]).unwrap();
-        assert_eq!(op.0, Push(Word::PSW));
+        assert_eq!(op.0, Push(Word::OnBoard(Internal::Wide(Double::DE))));
+        let op = decode(&[0xF5, 0xB0]).unwrap();
+        assert_eq!(op.0, Push(Word::ProgramStatus));
     }
 
     #[test]
     fn move_i() {
-        let op = Op::extract(&[0x0E, 0x09, 0xCD]).unwrap();
+        let op = decode(&[0x0E, 0x09, 0xCD]).unwrap();
         assert_eq!(op.1, 2);
-        assert_eq!(op.0, MoveImmediate { value: 0x09, to: Register::C });
-        let fail = Op::extract(&[0x26]).unwrap_err();
+        assert_eq!(op.0, MoveImmediate { value: 0x09, to: Byte::Single(Register::C) });
+        let fail = decode(&[0x26]).unwrap_err();
         assert_eq!(fail, Error::Invalid([0x26]));
     }
 }

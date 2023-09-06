@@ -20,14 +20,25 @@ mod foundation {
     pub use core::{array, convert, num, result, ops, slice};
 }
 pub use foundation::string::String;
-use foundation::{*, result::Result};
+use foundation::*;
 pub use boxed::Box;
 
 mod chip;
 
-use crate::ops::{Deref, Index, IndexMut, Range, RangeFull, RangeFrom, RangeTo, RangeToInclusive};
+use crate::ops::{Deref, DerefMut, Index, IndexMut, Range, RangeFull, RangeFrom, RangeTo, RangeToInclusive};
+pub use core::result::Result;
 
-pub trait Harness : IndexMut<u16, Output = u8> + Deref<Target=[u8]> {
+pub trait Harness {
+    fn read(&self, from: u16) -> u8;
+    fn read_word(&self, from: u16) -> u16 {
+        u16::from_le_bytes([self.read(from), self.read(from + 1)])
+    }
+    fn write(&mut self, value: u8, to: u16) { let _ = (value, to); }
+    fn write_word(&mut self, value: u16, to: u16) {
+        for (index, byte) in value.to_le_bytes().into_iter().enumerate() {
+            self.write(byte, to + index as u16)
+        }
+    }
 	fn input(&mut self, port: u8) -> u8;
 	fn output(&mut self, port: u8, value: u8);
     #[cfg(debug_assertions)]
@@ -52,12 +63,18 @@ impl Default for SimpleBoard {
 
 impl Deref for SimpleBoard {
     type Target = [u8];
-    fn deref(&self) -> &Self::Target {
-        &self.ram[..]
-    }
+    fn deref(&self) -> &Self::Target { &self.ram[..] }
 }
 
 impl Harness for SimpleBoard {
+    fn read(&self, from: u16) -> u8 { self[from] }
+    fn read_word(&self, from: u16) -> u16 {
+        u16::from_le_bytes([self.ram[from as usize], self.ram[from as usize + 1]])
+    }
+    fn write(&mut self, value: u8, to: u16) { self.ram[to as usize] = value; }
+    fn write_word(&mut self, value: u16, to: u16) {
+        [self.ram[to as usize], self.ram[to.wrapping_add(1) as usize]] = value.to_le_bytes();
+    }
 	fn input(&mut self, port: u8) -> u8 {
 		self.port_in[port as usize]
 	}
@@ -129,6 +146,26 @@ pub mod support {
 
 pub mod op {
     pub use super::chip::opcode::{Op::{self, *}, Flag::*, Test::*};
+}
+
+pub struct Machine<H: Harness, C: DerefMut<Target = H>> {
+    board: C,
+    chip: State,
+}
+
+impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
+    pub fn new(what: C) -> Self {
+        Self { board: what, chip: State::new() }
+    }
+}
+
+impl<H: Harness, C: DerefMut<Target = H>> Deref for Machine<H, C> {
+    type Target = State;
+    fn deref(&self) -> &Self::Target { &self.chip }
+}
+
+impl<H: Harness, C: DerefMut<Target = H>> DerefMut for Machine<H, C> {
+    fn deref_mut(&mut self) -> &mut Self::Target { &mut self.chip }
 }
 
 pub use chip::State;
