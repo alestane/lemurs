@@ -87,15 +87,19 @@ impl State {
             bits & 0b10000000 != 0,
         );
     }
+    #[must_use]
     fn update_flags(&mut self) -> &mut bool {
-        let accumulator = self.register[6];
-        let mut parity = accumulator;
+        self.update_flags_for(self[Register::A])
+    }
+    #[must_use]
+    fn update_flags_for(&mut self, value: u8) -> &mut bool {
+        let mut parity = value;
         for offset in [4, 2, 1] {
             parity ^= parity >> offset;
         }
-        self.p = parity & 0b01 == 0;
-        self.z = accumulator == 0;
-        self.m = accumulator & 0b1000_0000 != 0;
+        self.p = (parity & 0x01) == 0;
+        self.z = value == 0;
+        self.m = value & 0b1000_0000 != 0;
         self.a = false;
         &mut self.c
     }

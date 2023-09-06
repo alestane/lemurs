@@ -88,6 +88,12 @@ impl Op {
             } else {
                 11
             }
+            CompareWith{value} => {
+                let base = chip[Register::A];
+                let (comparison, borrow) = base.overflowing_sub(value);
+                *chip.update_flags_for(comparison) = !borrow;
+                7
+            }
             ExchangeDoubleWithHilo => {
                 let reg = &mut chip.register;
                 (reg[2], reg[3], reg[4], reg[5]) = (reg[4], reg[5], reg[2], reg[3]);
@@ -223,6 +229,20 @@ mod test {
         assert_eq!(chip.sp, 0x00FC);
         assert_eq!(env[0x00FC], 0xA2);
         assert_eq!(env[0x00FD], 0x00);
+    }
+
+    #[test]
+    fn compare_i() {
+        let mut env = Socket::default();
+        let mut chip = State::new();
+        chip[Register::A] = 0b01011011;
+        CompareWith { value: 0b10100011 }.execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip[Register::A], 0x5B);
+        assert!(!chip.a, "Auxilliary carry flag set");
+        assert!(!chip.c, "Carry flag set");
+        assert!(!chip.z, "Zero flag set");
+        assert!(chip.m, "Sign flag cleared");
+        assert!(chip.p, "Parity flag odd");
     }
 
     #[test]

@@ -134,6 +134,7 @@ mod b11111111 {
 
     const AndImmediate: u8  = 0b11100110;
     const AddImmediate: u8  = 0b11000110;
+    const CompareImmediate: u8   = 0b11111110;
 
     const StoreHiLoDirect: u8   = 0b00100010;
     const Jump: u8  = 0b11000011;
@@ -211,6 +212,7 @@ impl TryFrom<[u8;2]> for Op {
         let action = match action {
             b11111111::AddImmediate => return Ok(AddTo { value: data }),
             b11111111::AndImmediate => return Ok(AndWith { value: data }),
+            b11111111::CompareImmediate => return Ok(CompareWith{ value: data }),
             _next => action,
         };
         let _action = match action & 0b11_000_111 {
@@ -367,5 +369,14 @@ mod test {
         assert_eq!(op.0, MoveData { value: 0x09, to: Byte::Single(Register::C) });
         let fail = decode(&[0x26]).unwrap_err();
         assert_eq!(fail, Error::Invalid([0x26]));
+    }
+
+    #[test]
+    fn compare_i() {
+        let op = decode(&[0xFE, 0x2B]).unwrap();
+        assert_eq!(op.1, 2);
+        assert_eq!(op.0, CompareWith{value: 0x2B});
+        let fail = decode(&[0xFE]).unwrap_err();
+        assert_eq!(fail, Error::Invalid([0xFE]));
     }
 }
