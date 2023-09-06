@@ -5,15 +5,16 @@ use crate::{convert::TryFrom, chip::access::{Byte, Register, Word, Double, Inter
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Op {
     NOP(u8),
-    AddImmediate{value: u8},
-    AndImmediate{value: u8},
+    AddTo{value: u8},
+    AndWith{value: u8},
     Call{sub: u16},
     CallIf(Test, u16),
+    CompareWith{ value: u8 },
     ExchangeDoubleWithHilo, 
     Jump{to: u16},
     JumpIf(Test, u16),
-    LoadExtendedImmediate{to: Internal, value: u16 },
-    MoveImmediate{value: u8, to: Byte},
+    LoadExtendedWith{to: Internal, value: u16 },
+    MoveData{value: u8, to: Byte},
     Push(Word),
     Reset{vector: u8},
     ReturnIf(Test),
@@ -208,12 +209,12 @@ impl TryFrom<[u8;2]> for Op {
     fn try_from(value: [u8;2]) -> Result<Self, Self::Error> {
         let [action, data] = value;
         let action = match action {
-            b11111111::AddImmediate => return Ok(AddImmediate { value: data }),
-            b11111111::AndImmediate => return Ok(AndImmediate { value: data }),
+            b11111111::AddImmediate => return Ok(AddTo { value: data }),
+            b11111111::AndImmediate => return Ok(AndWith { value: data }),
             _next => action,
         };
         let _action = match action & 0b11_000_111 {
-            b11_000_111::MoveImmediate => return Ok(MoveImmediate{ value: data, to: Byte::from(action) }),
+            b11_000_111::MoveImmediate => return Ok(MoveData{ value: data, to: Byte::from(action) }),
             _next => action,
         };
         Err(value)
@@ -231,7 +232,7 @@ impl TryFrom<[u8;3]> for Op {
             _ => action,
         };
         match action & 0b11_00_1111 {
-            b11_00_1111::LoadExtendedImmediate => return Ok(LoadExtendedImmediate { to: Internal::from(action), value: data }),
+            b11_00_1111::LoadExtendedImmediate => return Ok(LoadExtendedWith { to: Internal::from(action), value: data }),
             _ => action,
         };
         match action & 0b11_000_111 {
@@ -247,9 +248,9 @@ impl Op {
     pub fn len(&self) -> u8 {
         match self {
             Call{..} | CallIf(..) | Jump{..} | JumpIf(..) | 
-            LoadExtendedImmediate{..} | ReturnIf(..) 
+            LoadExtendedWith{..} | ReturnIf(..) 
                 => 3,
-            AddImmediate{..} | AndImmediate{..} | MoveImmediate{..}
+            AddTo{..} | AndWith{..} | CompareWith{..} | MoveData{..}
                 => 2,
             NOP(..) | Push{..} | Reset{..} | ExchangeDoubleWithHilo
                 => 1,
@@ -317,7 +318,7 @@ mod test {
     #[test]
     fn load_xi() {
         let op = decode(&[0x31, 0x25, 0x02]).unwrap();
-        assert_eq!(op.0, LoadExtendedImmediate { to: Internal::StackPointer, value: 549 });
+        assert_eq!(op.0, LoadExtendedWith { to: Internal::StackPointer, value: 549 });
         let fail = decode(&[0x11, 0x21]).unwrap_err();
         assert_eq!(fail, Error::InvalidPair([0x11, 0x21]));
     }
@@ -345,7 +346,7 @@ mod test {
     #[test]
     fn adi() {
         let op = decode(&[0xC6, 0x39, 0x02]).unwrap();
-        assert_eq!(op.0, AddImmediate { value: 0x39 });
+        assert_eq!(op.0, AddTo { value: 0x39 });
         let fail = decode(&[0xC6]).unwrap_err();
         assert_eq!(fail, Error::Invalid([0xC6]));
     }
@@ -363,7 +364,7 @@ mod test {
     fn move_i() {
         let op = decode(&[0x0E, 0x09, 0xCD]).unwrap();
         assert_eq!(op.1, 2);
-        assert_eq!(op.0, MoveImmediate { value: 0x09, to: Byte::Single(Register::C) });
+        assert_eq!(op.0, MoveData { value: 0x09, to: Byte::Single(Register::C) });
         let fail = decode(&[0x26]).unwrap_err();
         assert_eq!(fail, Error::Invalid([0x26]));
     }
