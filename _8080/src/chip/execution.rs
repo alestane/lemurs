@@ -123,6 +123,18 @@ impl Op {
                     Byte::Indirect => unreachable!()
                 }
             }
+            Pop(target) => {
+                match target {
+                    Word::OnBoard(internal) => chip[internal] = bus.read_word(chip.pop()),
+                    Word::ProgramStatus => {
+                        let [accumulator, status] = bus.read_word(chip.pop()).to_le_bytes();
+                        chip[Register::A] = accumulator;
+                        chip.extract_flags(status);
+                    }
+                    _ => unreachable!()
+                };
+                10
+            }
             Push (source) => {
                 let source = match source {
                     Word::OnBoard(internal) => chip[internal],
@@ -287,6 +299,20 @@ mod test {
         LoadExtendedWith { to: Internal::Wide(HL), value: 0x6472 }.execute_on(&mut chip, &mut env).unwrap();
         assert_eq!(chip.register[4], 0x72);
         assert_eq!(chip.register[5], 0x64);
+    }
+
+    #[test]
+    fn pop() {
+        let mut env = SimpleBoard::default();
+        let mut chip = State::new();
+        chip[BC] = 0x8372;
+        chip[DE] = 0x4928;
+        chip[HL] = 0x5B6E;
+        chip.sp = 0x0238;
+        [env[0x0238], env[0x0239]] = [0xB6, 0x4E];
+        Pop(Word::OnBoard(Internal::Wide(BC))).execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip[BC], 0x4EB6);
+        assert_eq!(chip.sp, 0x023A);
     }
 
     #[test]

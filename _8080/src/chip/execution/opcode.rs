@@ -17,6 +17,7 @@ pub enum Op {
     LoadExtendedWith{to: Internal, value: u16 },
     MoveData{value: u8, to: Byte},
     Push(Word),
+    Pop(Word),
     Reset{vector: u8},
     Return,
     ReturnIf(Test),
@@ -148,6 +149,7 @@ mod b11111111 {
 mod b11_00_1111 {
     const LoadExtendedImmediate: u8 = 0b00_00_0001;
     const Push: u8  = 0b11_00_0101;
+    const Pop: u8 = 0b11_00_0001;
 }
 
 #[disclose]
@@ -202,6 +204,7 @@ impl TryFrom<[u8;1]> for Op {
             };
             let _value = match value & 0b11_00_1111 {
                 b11_00_1111::Push => return Ok(Push(match Internal::from(value) { Internal::StackPointer => Word::ProgramStatus, wide => Word::OnBoard(wide)})),
+                b11_00_1111::Pop => return Ok(Pop(match Internal::from(value) { Internal::StackPointer => Word::ProgramStatus, wide => Word::OnBoard(wide)})),
                 _ => value,
             };
         }
@@ -258,7 +261,7 @@ impl Op {
                 => 3,
             AddTo{..} | AndWith{..} | CompareWith{..} | MoveData{..}
                 => 2,
-            NOP(..) | Push{..} | Reset{..} | ExchangeDoubleWithHilo | Return | Halt
+            NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..)
                 => 1,
         }
     }
@@ -367,6 +370,12 @@ mod test {
         assert_eq!(op.0, AddTo { value: 0x39 });
         let fail = decode(&[0xC6]).unwrap_err();
         assert_eq!(fail, Error::Invalid([0xC6]));
+    }
+
+    #[test]
+    fn pop() {
+        let op = decode(&[0xE1]).unwrap();
+        assert_eq!(op.0, Pop(Word::OnBoard(Internal::Wide(Double::HL))));
     }
     
     #[test]
