@@ -100,6 +100,12 @@ impl Op {
                 (chip[Double::DE], chip[Double::HL]) = (chip[Double::HL], chip[Double::DE]);
                 5
             }
+            ExchangeTopWithHilo => {
+                let out = chip[Double::HL];
+                chip[Double::HL] = bus.read_word(chip.sp);
+                bus.write_word(out, chip.sp);
+                18
+            }
             Halt => {
                 chip.active = false;
                 7
@@ -250,6 +256,20 @@ mod test {
         assert_eq!(chip.sp, 0x00FC);
         assert_eq!(env[0x00FC], 0xA2);
         assert_eq!(env[0x00FD], 0x00);
+    }
+
+    #[test]
+    fn xthl() {
+        let mut env = SimpleBoard::default();
+        let mut chip = State::new();
+        chip.sp = 0x7BE3;
+        chip[HL] = 0x3472;
+        [env[0x7BE3], env[0x7BE4]] = [0x43, 0x29];
+        ExchangeTopWithHilo.execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip.sp, 0x7BE3);
+        assert_eq!(chip[L], 0x43);
+        assert_eq!(chip[H], 0x29);
+        assert_eq!(env.read_word(chip.sp), 0x3472);
     }
 
     #[test]

@@ -11,6 +11,7 @@ pub enum Op {
     CallIf(Test, u16),
     CompareWith{ value: u8 },
     ExchangeDoubleWithHilo, 
+    ExchangeTopWithHilo,
     Halt,
     Jump{to: u16},
     JumpIf(Test, u16),
@@ -195,6 +196,7 @@ impl TryFrom<[u8;1]> for Op {
                 b11111111::ExchangeDoubleWithHilo => return Ok(ExchangeDoubleWithHilo),
                 b11111111::Halt => return Ok(Halt),
                 b11111111::Return => return Ok(Return),
+                b11111111::ExchangeTopWithHilo => return Ok(ExchangeTopWithHilo),
                 _ => value
             };
             let value = match value & 0b11_000_111 {
@@ -261,7 +263,7 @@ impl Op {
                 => 3,
             AddTo{..} | AndWith{..} | CompareWith{..} | MoveData{..}
                 => 2,
-            NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..)
+            NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo
                 => 1,
         }
     }
@@ -308,6 +310,12 @@ mod test {
     fn no_op() {
         let op = decode(&[0x00]).unwrap();
         assert_eq!(op.0, NOP(4));
+    }
+
+    #[test]
+    fn xthl() {
+        let op = decode(&[0xE3, 0x1D]).unwrap();
+        assert_eq!(op.0, ExchangeTopWithHilo);
     }
 
     #[test]
