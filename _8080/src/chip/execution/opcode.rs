@@ -23,6 +23,7 @@ pub enum Op {
     Reset{vector: u8},
     Return,
     ReturnIf(Test),
+    RotateRightCarrying,
 }
 use Op::*;
 
@@ -204,6 +205,7 @@ impl TryFrom<[u8;1]> for Op {
                 b11111111::Halt => return Ok(Halt),
                 b11111111::Return => return Ok(Return),
                 b11111111::ExchangeTopWithHilo => return Ok(ExchangeTopWithHilo),
+                b11111111::RotateRightCarrying => return Ok(RotateRightCarrying),
                 _ => value
             };
             let _value = match value & 0b11_000_111 {
@@ -277,7 +279,8 @@ impl Op {
                 => 3,
             AddTo{..} | AndWith{..} | CompareWith{..} | MoveData{..}
                 => 2,
-            NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | Move{..}
+            NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | 
+            Move{..} | RotateRightCarrying
                 => 1,
         }
     }
@@ -415,6 +418,12 @@ mod test {
         assert_eq!(op.0, Push(Word::OnBoard(Internal::Wide(Double::DE))));
         let op = decode(&[0xF5, 0xB0]).unwrap();
         assert_eq!(op.0, Push(Word::ProgramStatus));
+    }
+
+    #[test]
+    fn rotate() {
+        let op = decode(&[0x0F, 0x0F]).unwrap();
+        assert_eq!(op.0, RotateRightCarrying);
     }
 
     #[test]

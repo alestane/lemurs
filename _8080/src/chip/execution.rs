@@ -185,6 +185,12 @@ impl Op {
                     5
                 }
             }
+            RotateRightCarrying => {
+                let accumulator = chip[Register::A];
+                chip.c = accumulator & 0x01 != 0;
+                chip[Register::A] = accumulator.rotate_right(1);
+                4
+            }
             NOP(n) => n,
             #[cfg(debug_assertions)]
             _ => unimplemented!("Op {self:?} not implemented yet")
@@ -412,6 +418,19 @@ mod test {
         Return.execute_on(&mut chip, &mut env).unwrap();
         assert_eq!(chip.sp, 0x8EA7);
         assert_eq!(chip.pc, 0x01FE);
+    }
+
+    #[test]
+    fn rotate() {
+        let mut env = Socket::default();
+        let mut chip = State::new();
+        chip[Register::A] = 0b0111_0101;
+        RotateRightCarrying.execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip[Register::A], 0b1011_1010);
+        assert!(chip.c, "Carry bit cleared");
+        RotateRightCarrying.execute_on(&mut chip, &mut env);
+        assert_eq!(chip[Register::A], 0b0101_1101);
+        assert!(!chip.c, "Carry bit set");
     }
 
     #[test]
