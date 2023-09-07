@@ -24,7 +24,7 @@ impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
             Ok(Some(_)) => (),
             _ => self.chip.active = false,
         };
-        if let Some(action) = self.board.did_execute(&self.chip)? {
+        if let Some(action) = self.board.did_execute(&self.chip, op)? {
             action.execute_on(&mut self.chip, self.board.deref_mut()).unwrap();
         }
         outcome
@@ -93,7 +93,7 @@ impl Op {
             CompareWith{value} => {
                 let base = chip[Register::A];
                 let (comparison, borrow) = base.overflowing_sub(value);
-                *chip.update_flags_for(comparison) = !borrow;
+                *chip.update_flags_for(comparison) = borrow;
                 7
             }
             ExchangeDoubleWithHilo => {
@@ -428,7 +428,7 @@ mod test {
         RotateRightCarrying.execute_on(&mut chip, &mut env).unwrap();
         assert_eq!(chip[Register::A], 0b1011_1010);
         assert!(chip.c, "Carry bit cleared");
-        RotateRightCarrying.execute_on(&mut chip, &mut env);
+        RotateRightCarrying.execute_on(&mut chip, &mut env).unwrap();
         assert_eq!(chip[Register::A], 0b0101_1101);
         assert!(!chip.c, "Carry bit set");
     }

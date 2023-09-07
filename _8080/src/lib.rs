@@ -55,7 +55,7 @@ pub trait Harness {
 	fn input(&mut self, port: u8) -> u8;
 	fn output(&mut self, port: u8, value: u8);
     #[cfg(debug_assertions)]
-    fn did_execute(&mut self, _client: &State) -> Result<Option<op::Op>, String> { Ok( None )}
+    fn did_execute(&mut self, client: &State, did: op::Op) -> Result<Option<op::Op>, String> { let _ = (client, did); Ok( None ) }
 }
 
 pub struct SimpleBoard {
