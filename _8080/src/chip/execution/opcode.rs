@@ -16,6 +16,7 @@ pub enum Op {
     Jump{to: u16},
     JumpIf(Test, u16),
     LoadExtendedWith{to: Internal, value: u16 },
+    Move{to: Byte, from: Byte},
     MoveData{value: u8, to: Byte},
     Push(Word),
     Pop(Word),
@@ -163,6 +164,12 @@ mod b11_000_111 {
     const MoveImmediate: u8 = 0b00_000_110;
 }
 
+#[disclose]
+#[allow(non_upper_case_globals)]
+mod b11_000000 {
+    const Move: u8  = 0b01_000000;
+}
+
 pub struct OutOfRange;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Error {
@@ -199,7 +206,7 @@ impl TryFrom<[u8;1]> for Op {
                 b11111111::ExchangeTopWithHilo => return Ok(ExchangeTopWithHilo),
                 _ => value
             };
-            let value = match value & 0b11_000_111 {
+            let _value = match value & 0b11_000_111 {
                 b11_000_111::Reset => return Ok(Reset{vector: value >> 3 & 0x07}),
                 b11_000_111::ReturnIf => return Ok(ReturnIf(Test::from(value))),
                 _ => value,
@@ -207,6 +214,13 @@ impl TryFrom<[u8;1]> for Op {
             let _value = match value & 0b11_00_1111 {
                 b11_00_1111::Push => return Ok(Push(match Internal::from(value) { Internal::StackPointer => Word::ProgramStatus, wide => Word::OnBoard(wide)})),
                 b11_00_1111::Pop => return Ok(Pop(match Internal::from(value) { Internal::StackPointer => Word::ProgramStatus, wide => Word::OnBoard(wide)})),
+                _ => value,
+            };
+            let _value = match value & 0b11_000000 {
+                b11_000000::Move => {
+                    let (to, from) = Byte::split(value);
+                    return Ok(Move{to, from});
+                }
                 _ => value,
             };
         }
@@ -263,7 +277,7 @@ impl Op {
                 => 3,
             AddTo{..} | AndWith{..} | CompareWith{..} | MoveData{..}
                 => 2,
-            NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo
+            NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | Move{..}
                 => 1,
         }
     }
@@ -316,6 +330,14 @@ mod test {
     fn xthl() {
         let op = decode(&[0xE3, 0x1D]).unwrap();
         assert_eq!(op.0, ExchangeTopWithHilo);
+    }
+
+    #[test]
+    fn move_() {
+        let op = decode(&[0x56]).unwrap();
+        assert_eq!(op.0, Move{to: Byte::Single(Register::D), from: Byte::Indirect});
+        let op = decode(&[76]).unwrap();
+        assert_ne!(op.0, Move{to: Byte::Indirect, from: Byte::Indirect});
     }
 
     #[test]

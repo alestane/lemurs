@@ -122,6 +122,24 @@ impl Op {
                 chip[to] = value;
                 10
             }
+            Move{to, from} => {
+                let (to, from) = (chip.resolve_byte(to), chip.resolve_byte(from));
+                match (to, from) {
+                    (Byte::Single(to), Byte::Single(from)) => {
+                        chip[to] = chip[from];
+                        5
+                    }
+                    (Byte::RAM(address), Byte::Single(from)) => {
+                        bus.write(chip[from], address);
+                        7
+                    }
+                    (Byte::Single(to), Byte::RAM(address)) => {
+                        chip[to] = bus.read(address);
+                        7
+                    }
+                    _ => unreachable!()
+                }
+            }
             MoveData { value, to } => {
                 match chip.resolve_byte(to) {
                     Byte::Single(register) => { chip[register] = value; 7 },
@@ -319,6 +337,21 @@ mod test {
         LoadExtendedWith { to: Internal::Wide(HL), value: 0x6472 }.execute_on(&mut chip, &mut env).unwrap();
         assert_eq!(chip.register[4], 0x72);
         assert_eq!(chip.register[5], 0x64);
+    }
+
+    #[test]
+    fn move_() {
+        let mut env = SimpleBoard::default();
+        let mut chip = State::new();
+        chip[Register::A] = 0x05;
+        chip[Register::H] = 0x02;
+        chip[Register::L] = 0xA4;
+        chip[Register::B] = 0x32;
+        env[0x02A4] = 0xD4;
+        env[0x0205] = 0xB2;
+        Move{to: Byte::Single(Register::L), from: Byte::Single(Register::A)}.execute_on(&mut chip, &mut env).unwrap();
+        Move{to: Byte::Single(Register::B), from: Byte::Indirect}.execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip[Register::B], 0xB2);
     }
 
     #[test]
