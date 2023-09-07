@@ -5,7 +5,7 @@ use crate::{convert::TryFrom, chip::access::{Byte, Register, Word, Double, Inter
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Op {
     NOP(u8),
-    AddTo{value: u8},
+    AddTo{value: u8, carry: bool},
     AndWith{value: u8},
     Call{sub: u16},
     CallIf(Test, u16),
@@ -140,6 +140,7 @@ mod b11111111 {
 
     const AndImmediate: u8  = 0b11100110;
     const AddImmediate: u8  = 0b11000110;
+    const AddImmediateCarrying: u8  = 0b11001110;
     const CompareImmediate: u8   = 0b11111110;
 
     const StoreHiLoDirect: u8   = 0b00100010;
@@ -235,7 +236,8 @@ impl TryFrom<[u8;2]> for Op {
     fn try_from(value: [u8;2]) -> Result<Self, Self::Error> {
         let [action, data] = value;
         let action = match action {
-            b11111111::AddImmediate => return Ok(AddTo { value: data }),
+            b11111111::AddImmediate => return Ok(AddTo { value: data, carry: false }),
+            b11111111::AddImmediateCarrying => return Ok(AddTo{ value: data, carry: true }),
             b11111111::AndImmediate => return Ok(AndWith { value: data }),
             b11111111::CompareImmediate => return Ok(CompareWith{ value: data }),
             _next => action,
@@ -400,9 +402,11 @@ mod test {
     #[test]
     fn adi() {
         let op = decode(&[0xC6, 0x39, 0x02]).unwrap();
-        assert_eq!(op.0, AddTo { value: 0x39 });
+        assert_eq!(op.0, AddTo { value: 0x39, carry: false });
         let fail = decode(&[0xC6]).unwrap_err();
         assert_eq!(fail, Error::Invalid([0xC6]));
+        let op = decode(&[0xCE, 0x72]).unwrap();
+        assert_eq!(op.0, AddTo{value: 0x72, carry: true});
     }
 
     #[test]

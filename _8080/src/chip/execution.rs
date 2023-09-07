@@ -65,10 +65,11 @@ impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
 impl Op {
     fn execute_on<H: Harness>(self, chip: &mut State, mut bus: impl DerefMut<Target = H>) -> OpOutcome {
         let cycles = match self {
-            AddTo { value } => {
+            AddTo { value, carry } => {
+                let carry_in = chip.c && carry;
                 let accumulator = &mut chip[Register::A];
                 let aux = *accumulator ^ value;
-                let (value, carry) = accumulator.overflowing_add(value);
+                let (value, carry) = accumulator.overflowing_add(value.wrapping_add(carry_in as u8));
                 *accumulator = value;
                 *chip.update_flags() = carry;
                 chip.a = (value ^ aux) & 0x10 != 0;
@@ -213,7 +214,7 @@ mod test {
         let mut harness = Socket::default();
         let mut chip = State::new();
         chip[Register::A] = 0x75;
-        AddTo { value: 0x49 }.execute_on(&mut chip, &mut harness).unwrap();
+        AddTo { value: 0x49, carry: false }.execute_on(&mut chip, &mut harness).unwrap();
         assert_eq!(chip.register[6], 0xBE);
         assert!(!chip.a, "aux carry was {}", chip.a);
         assert!(!chip.c, "carry was {}", chip.c);
@@ -221,12 +222,20 @@ mod test {
         assert!(chip.m, "sign bit was {}", chip.m);
         assert!(chip.p, "parity bit was {}", chip.p);
 
-        AddTo { value: 0x43 }.execute_on(&mut chip, &mut harness).unwrap();
+        AddTo { value: 0x43, carry: false }.execute_on(&mut chip, &mut harness).unwrap();
         assert_eq!(chip.register[6], 0x01, "Sum was {}", chip.register[6]);
         assert!(chip.a, "aux carry was {}", chip.a);
         assert!(chip.c, "carry was {}", chip.c);
         assert!(!chip.z, "zero bit was {}", chip.z);
         assert!(!chip.m, "sign bit was {}", chip.m);
+        assert!(!chip.p, "parity bit was {}", chip.p);
+
+        AddTo { value: 0x7E, carry: true }.execute_on(&mut chip, &mut harness).unwrap();
+        assert_eq!(chip.register[6], 0x80, "Sum was {}", chip.register[6]);
+        assert!(chip.a, "aux carry was {}", chip.a);
+        assert!(!chip.c, "carry was {}", chip.c);
+        assert!(!chip.z, "zero bit was {}", chip.z);
+        assert!(chip.m, "sign bit was {}", chip.m);
         assert!(!chip.p, "parity bit was {}", chip.p);
      }
 
@@ -268,7 +277,7 @@ mod test {
         assert_eq!(env[0x0100], 0x55);
 
         chip.register[6] = 0xC4;
-        AddTo { value: 0x3C }.execute_on(&mut chip, &mut env).unwrap();
+        AddTo { value: 0x3C, carry: false }.execute_on(&mut chip, &mut env).unwrap();
         CallIf(Not(Zero), 0x2000).execute_on(&mut chip, &mut env).unwrap();
         assert_eq!(chip.pc, 0x00A2);
         assert_eq!(chip.sp, 0x00FE);
@@ -300,11 +309,11 @@ mod test {
     fn compare_i() {
         let mut env = Socket::default();
         let mut chip = State::new();
-        chip[Register::A] = 0b01011011;
+        chip[Register::A]  = 0b01011011;
         CompareWith { value: 0b10100011 }.execute_on(&mut chip, &mut env).unwrap();
         assert_eq!(chip[Register::A], 0x5B);
         assert!(!chip.a, "Auxilliary carry flag set");
-        assert!(!chip.c, "Carry flag set");
+        assert!(chip.c, "Carry flag cleared");
         assert!(!chip.z, "Zero flag set");
         assert!(chip.m, "Sign flag cleared");
         assert!(chip.p, "Parity flag odd");
@@ -328,7 +337,7 @@ mod test {
         Jump{ to: 0x0340 }.execute_on(&mut chip, &mut env).unwrap();
         assert_eq!(chip.pc, 0x0340);
         chip.register[6] = 0x90;
-        AddTo { value: 0x73 }.execute_on(&mut chip, &mut env).unwrap();
+        AddTo { value: 0x73, carry: false }.execute_on(&mut chip, &mut env).unwrap();
         JumpIf(Not(Carry), 0x1203).execute_on(&mut chip, &mut env).unwrap();
         assert_eq!(chip.pc, 0x0340);
         assert!(!chip.m, "MINUS flag was {} after result {}", chip.m, chip.register[6]);
@@ -388,7 +397,7 @@ mod test {
         assert_eq!(chip.sp, 0x3FFE);
 
         chip.register[6] = 0x90;
-        AddTo { value: 0x73 }.execute_on(&mut chip, &mut env).unwrap();
+        AddTo { value: 0x73, carry: false }.execute_on(&mut chip, &mut env).unwrap();
         Push(Word::ProgramStatus).execute_on(&mut chip, &mut env).unwrap();
         assert_eq!(chip.sp, 0x3FFC);
         assert_eq!(env[0x3FFC], 0x03);
