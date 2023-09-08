@@ -24,6 +24,7 @@ pub enum Op {
     Return,
     ReturnIf(Test),
     RotateRightCarrying,
+    SubtractBy{value: u8, carry: bool},
 }
 use Op::*;
 
@@ -141,6 +142,8 @@ mod b11111111 {
     const AndImmediate: u8  = 0b11100110;
     const AddImmediate: u8  = 0b11000110;
     const AddImmediateCarrying: u8  = 0b11001110;
+    const SubtractImmediate: u8     = 0b11010110;
+    const SubtractImmediateBorrowing: u8    = 0b11011110;
     const CompareImmediate: u8   = 0b11111110;
 
     const StoreHiLoDirect: u8   = 0b00100010;
@@ -233,20 +236,22 @@ impl TryFrom<[u8;1]> for Op {
 
 impl TryFrom<[u8;2]> for Op {
     type Error = [u8;2];
-    fn try_from(value: [u8;2]) -> Result<Self, Self::Error> {
-        let [action, data] = value;
+    fn try_from(code: [u8;2]) -> Result<Self, Self::Error> {
+        let [action, value] = code;
         let action = match action {
-            b11111111::AddImmediate => return Ok(AddTo { value: data, carry: false }),
-            b11111111::AddImmediateCarrying => return Ok(AddTo{ value: data, carry: true }),
-            b11111111::AndImmediate => return Ok(AndWith { value: data }),
-            b11111111::CompareImmediate => return Ok(CompareWith{ value: data }),
+            b11111111::AddImmediate => return Ok(AddTo { value, carry: false }),
+            b11111111::AddImmediateCarrying => return Ok(AddTo{ value, carry: true }),
+            b11111111::AndImmediate => return Ok(AndWith { value }),
+            b11111111::SubtractImmediate => return Ok(SubtractBy{ value, carry: false }),
+            b11111111::SubtractImmediateBorrowing => return Ok(SubtractBy { value, carry: true }),
+            b11111111::CompareImmediate => return Ok(CompareWith{ value }),
             _next => action,
         };
         let _action = match action & 0b11_000_111 {
-            b11_000_111::MoveImmediate => return Ok(MoveData{ value: data, to: Byte::from(action) }),
+            b11_000_111::MoveImmediate => return Ok(MoveData{ value, to: Byte::from(action) }),
             _next => action,
         };
-        Err(value)
+        Err(code)
     }
 }
 
@@ -279,7 +284,7 @@ impl Op {
             Call{..} | CallIf(..) | Jump{..} | JumpIf(..) | 
             LoadExtendedWith{..} | ReturnIf(..) 
                 => 3,
-            AddTo{..} | AndWith{..} | CompareWith{..} | MoveData{..}
+            AddTo{..} | AndWith{..} | SubtractBy{..} | CompareWith{..} | MoveData{..}
                 => 2,
             NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | 
             Move{..} | RotateRightCarrying
@@ -437,6 +442,14 @@ mod test {
         assert_eq!(op.0, MoveData { value: 0x09, to: Byte::Single(Register::C) });
         let fail = decode(&[0x26]).unwrap_err();
         assert_eq!(fail, Error::Invalid([0x26]));
+    }
+
+    #[test]
+    fn subtract() {
+        let op = decode(&[0xD6, 0x79, 0x01]).unwrap();
+        assert_eq!(op.0, SubtractBy{value: 0x79, carry: false});
+        let op = decode(&[0xDE, 0x9E]).unwrap();
+        assert_eq!(op.0, SubtractBy{value: 0x9E, carry: true});
     }
 
     #[test]

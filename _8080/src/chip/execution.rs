@@ -192,6 +192,16 @@ impl Op {
                 chip[Register::A] = accumulator.rotate_right(1);
                 4
             }
+            SubtractBy{ value, carry } => {
+                let carry = chip.c && carry;
+                let accumulator = &mut chip[Register::A];
+                let aux = *accumulator ^ value;
+                let (value, carry) = accumulator.overflowing_sub(value.wrapping_add(carry as u8));
+                *accumulator = value;
+                *chip.update_flags() = carry;
+                chip.a = (value ^ aux) & 0x10 == 0;
+                7
+            }
             NOP(n) => n,
             #[cfg(debug_assertions)]
             _ => unimplemented!("Op {self:?} not implemented yet")
@@ -440,6 +450,34 @@ mod test {
         RotateRightCarrying.execute_on(&mut chip, &mut env).unwrap();
         assert_eq!(chip[Register::A], 0b0101_1101);
         assert!(!chip.c, "Carry bit set");
+    }
+
+    #[test]
+    fn subtract() {
+        let mut env = Socket::default();
+        let mut chip = State::new();
+        chip[Register::A] = 0b1001_0011;
+        SubtractBy{value: 0b1011_0110, carry: false}.execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip[Register::A], 0b1101_1101);
+        assert!(!chip.a, "Auxilliary carry flag set");
+        assert!(chip.c, "Carry flag cleared");
+        assert!(!chip.z, "Zero flag set");
+        assert!(chip.m, "Sign flag cleared");
+        assert!(chip.p, "Parity flag odd");
+        SubtractBy { value: 0b1101_1101, carry: false }.execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip[Register::A], 0b0000_0000);
+        assert!(chip.a, "Auxilliary carry flag clear");
+        assert!(!chip.c, "Carry flag set");
+        assert!(chip.z, "Zero flag cleared");
+        assert!(!chip.m, "Sign flag set");
+        assert!(chip.p, "Parity flag odd");
+        chip.c = true;
+        SubtractBy { value: 0b0011_1100, carry: true }.execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip[Register::A], 0b1100_0011);
+        assert!(chip.c, "carry flag reset");
+        assert!(!chip.z, "zero flag set");
+        assert!(chip.m, "sign flag reset");
+        assert!(chip.p, "parity flag odd");
     }
 
     #[test]
