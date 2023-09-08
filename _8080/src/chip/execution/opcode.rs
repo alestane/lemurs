@@ -12,6 +12,7 @@ pub enum Op {
     CompareWith{ value: u8 },
     ExchangeDoubleWithHilo, 
     ExchangeTopWithHilo,
+    ExclusiveOrWith{value: u8},
     Halt,
     Jump{to: u16},
     JumpIf(Test, u16),
@@ -145,6 +146,7 @@ mod b11111111 {
     const AddImmediateCarrying: u8  = 0b11001110;
     const SubtractImmediate: u8     = 0b11010110;
     const SubtractImmediateBorrowing: u8    = 0b11011110;
+    const ExclusiveOr: u8   = 0b11101110;
     const OrImmediate: u8   = 0b11110110;
     const CompareImmediate: u8   = 0b11111110;
 
@@ -243,9 +245,10 @@ impl TryFrom<[u8;2]> for Op {
         let action = match action {
             b11111111::AddImmediate => return Ok(AddTo { value, carry: false }),
             b11111111::AddImmediateCarrying => return Ok(AddTo{ value, carry: true }),
-            b11111111::AndImmediate => return Ok(AndWith { value }),
             b11111111::SubtractImmediate => return Ok(SubtractBy{ value, carry: false }),
             b11111111::SubtractImmediateBorrowing => return Ok(SubtractBy { value, carry: true }),
+            b11111111::AndImmediate => return Ok(AndWith { value }),
+            b11111111::ExclusiveOr => return Ok(ExclusiveOrWith{value}),
             b11111111::OrImmediate => return Ok(OrWith{value}),
             b11111111::CompareImmediate => return Ok(CompareWith{ value }),
             _next => action,
@@ -287,7 +290,7 @@ impl Op {
             Call{..} | CallIf(..) | Jump{..} | JumpIf(..) | 
             LoadExtendedWith{..} | ReturnIf(..) 
                 => 3,
-            AddTo{..} | AndWith{..} | OrWith{..} | SubtractBy{..} | CompareWith{..} | MoveData{..}
+            AddTo{..} | AndWith{..} | ExclusiveOrWith{..} | OrWith{..} | SubtractBy{..} | CompareWith{..} | MoveData{..}
                 => 2,
             NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | 
             Move{..} | RotateRightCarrying
@@ -343,6 +346,12 @@ mod test {
     fn and() {
         let op = decode(&[0xE6, 0x79]).unwrap();
         assert_eq!(op.0, AndWith{value: 0x79});
+    }
+
+    #[test]
+    fn xor() {
+        let op = decode(&[0xEE, 0x4D]).unwrap();
+        assert_eq!(op.0, ExclusiveOrWith { value: 0x4D });
     }
 
     #[test]

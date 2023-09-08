@@ -107,6 +107,11 @@ impl Op {
                 bus.write_word(out, chip.sp);
                 18
             }
+            ExclusiveOrWith { value } => {
+                chip[Register::A] ^= value;
+                *chip.update_flags() = false;
+                7
+            }
             Halt => {
                 chip.active = false;
                 7
@@ -318,6 +323,20 @@ mod test {
         assert_eq!(chip[L], 0x43);
         assert_eq!(chip[H], 0x29);
         assert_eq!(env.read_word(chip.sp), 0x3472);
+    }
+
+    #[test]
+    fn xor() {
+        let mut env = Socket::default();
+        let mut chip = State::new();
+        chip[Register::A] = 0b10011100;
+        *chip.update_flags() = true;
+        ExclusiveOrWith { value: 0b00111110 }.execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip[Register::A], 0b10100010);
+        assert!(!chip.c, "Carry flag set");
+        assert!(!chip.z, "Zero flag set");
+        assert!(chip.m, "minus flag reset");
+        assert!(!chip.p, "parity flag even");
     }
 
     #[test]
