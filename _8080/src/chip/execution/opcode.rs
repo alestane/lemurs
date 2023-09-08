@@ -18,6 +18,7 @@ pub enum Op {
     LoadExtendedWith{to: Internal, value: u16 },
     Move{to: Byte, from: Byte},
     MoveData{value: u8, to: Byte},
+    OrWith{value: u8},
     Push(Word),
     Pop(Word),
     Reset{vector: u8},
@@ -144,6 +145,7 @@ mod b11111111 {
     const AddImmediateCarrying: u8  = 0b11001110;
     const SubtractImmediate: u8     = 0b11010110;
     const SubtractImmediateBorrowing: u8    = 0b11011110;
+    const OrImmediate: u8   = 0b11110110;
     const CompareImmediate: u8   = 0b11111110;
 
     const StoreHiLoDirect: u8   = 0b00100010;
@@ -244,6 +246,7 @@ impl TryFrom<[u8;2]> for Op {
             b11111111::AndImmediate => return Ok(AndWith { value }),
             b11111111::SubtractImmediate => return Ok(SubtractBy{ value, carry: false }),
             b11111111::SubtractImmediateBorrowing => return Ok(SubtractBy { value, carry: true }),
+            b11111111::OrImmediate => return Ok(OrWith{value}),
             b11111111::CompareImmediate => return Ok(CompareWith{ value }),
             _next => action,
         };
@@ -284,7 +287,7 @@ impl Op {
             Call{..} | CallIf(..) | Jump{..} | JumpIf(..) | 
             LoadExtendedWith{..} | ReturnIf(..) 
                 => 3,
-            AddTo{..} | AndWith{..} | SubtractBy{..} | CompareWith{..} | MoveData{..}
+            AddTo{..} | AndWith{..} | OrWith{..} | SubtractBy{..} | CompareWith{..} | MoveData{..}
                 => 2,
             NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | 
             Move{..} | RotateRightCarrying
@@ -334,6 +337,18 @@ mod test {
     fn no_op() {
         let op = decode(&[0x00]).unwrap();
         assert_eq!(op.0, NOP(4));
+    }
+
+    #[test]
+    fn and() {
+        let op = decode(&[0xE6, 0x79]).unwrap();
+        assert_eq!(op.0, AndWith{value: 0x79});
+    }
+
+    #[test]
+    fn or() {
+        let op = decode(&[0xF6, 0x23]).unwrap();
+        assert_eq!(op.0, OrWith{value: 0x23});
     }
 
     #[test]

@@ -148,6 +148,11 @@ impl Op {
                     Byte::Indirect => unreachable!()
                 }
             }
+            OrWith{value} => {
+                chip[Register::A] |= value;
+                *chip.update_flags() = false;
+                7
+            }
             Pop(target) => {
                 match target {
                     Word::OnBoard(internal) => chip[internal] = bus.read_word(chip.pop()),
@@ -377,6 +382,20 @@ mod test {
         Move{to: Byte::Single(Register::L), from: Byte::Single(Register::A)}.execute_on(&mut chip, &mut env).unwrap();
         Move{to: Byte::Single(Register::B), from: Byte::Indirect}.execute_on(&mut chip, &mut env).unwrap();
         assert_eq!(chip[Register::B], 0xB2);
+    }
+
+    #[test]
+    fn or() {
+        let mut env = Socket::default();
+        let mut chip = State::new();
+        chip[Register::A] = 0b01010110;
+        *chip.update_flags() = true;
+        OrWith{value: 0b00010101}.execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip[Register::A], 0b01010111);
+        assert!(!chip.c, "carry flag not reset");
+        assert!(!chip.z, "zero flag set");
+        assert!(!chip.m, "minus flag set");
+        assert!(!chip.p, "parity flag even");
     }
 
     #[test]
