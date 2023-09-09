@@ -14,6 +14,7 @@ pub enum Op {
     ExchangeDoubleWithHilo, 
     ExchangeTopWithHilo,
     ExclusiveOrWith{value: u8},
+    ExclusiveOrWithAccumulator{ from: Byte },
     Halt,
     IncrementByte{register: Byte},
     Jump{to: u16},
@@ -179,6 +180,12 @@ mod b11_000_111 {
 
 #[disclose]
 #[allow(non_upper_case_globals)]
+mod b11_111_000 {
+    const ExclusiveOrWithAccumulator: u8    = 0b10_101_000;
+}
+
+#[disclose]
+#[allow(non_upper_case_globals)]
 mod b11_000000 {
     const Move: u8  = 0b01_000000;
 }
@@ -230,6 +237,10 @@ impl TryFrom<[u8;1]> for Op {
             let _value = match value & 0b11_00_1111 {
                 b11_00_1111::Push => return Ok(Push(match Internal::from(value) { Internal::StackPointer => Word::ProgramStatus, wide => Word::OnBoard(wide)})),
                 b11_00_1111::Pop => return Ok(Pop(match Internal::from(value) { Internal::StackPointer => Word::ProgramStatus, wide => Word::OnBoard(wide)})),
+                _ => value,
+            };
+            let _value = match value & 0b11_111_000 {
+                b11_111_000::ExclusiveOrWithAccumulator => return Ok(ExclusiveOrWithAccumulator { from: Byte::from(value << 3) }),
                 _ => value,
             };
             let _value = match value & 0b11_000000 {
@@ -299,7 +310,7 @@ impl Op {
             AddTo{..} | AndWith{..} | ExclusiveOrWith{..} | OrWith{..} | SubtractBy{..} | CompareWith{..} | MoveData{..}
                 => 2,
             NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | 
-            Move{..} | RotateRightCarrying | IncrementByte {..} | DecrementByte {..}
+            Move{..} | RotateRightCarrying | IncrementByte {..} | DecrementByte {..} | ExclusiveOrWithAccumulator{..}
                 => 1,
         }
     }
@@ -370,6 +381,8 @@ mod test {
     fn xor() {
         let op = decode(&[0xEE, 0x4D]).unwrap();
         assert_eq!(op.0, ExclusiveOrWith { value: 0x4D });
+        let op = decode(&[0xA9]).unwrap();
+        assert_eq!(op.0, ExclusiveOrWithAccumulator { from: Byte::Single(Register::C) });
     }
 
     #[test]

@@ -126,6 +126,15 @@ impl Op {
                 *chip.update_flags() = false;
                 7
             }
+            ExclusiveOrWithAccumulator { from } => {
+                let (value, time) = match chip.resolve_byte(from) {
+                    Byte::Single(register) => (chip[register], 4),
+                    Byte::RAM(addr) => (bus.read(addr), 7),
+                    _ => unreachable!(),
+                };
+                ExclusiveOrWith{value}.execute_on(chip, bus)?;
+                time
+            }
             Halt => {
                 chip.active = false;
                 7
@@ -376,6 +385,14 @@ mod test {
         assert!(!chip.z, "Zero flag set");
         assert!(chip.m, "minus flag reset");
         assert!(!chip.p, "parity flag even");
+
+        chip[Register::D] = 0b10100010;
+        ExclusiveOrWithAccumulator { from: Byte::Single(Register::D) }.execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip[Register::A], 0);
+        assert!(chip.z, "Zero flag reset");
+        assert!(chip.p, "parity flag odd");
+        assert!(!chip.c, "carry flag set");
+        assert!(!chip.m, "sign flag set");
     }
 
     #[test]
