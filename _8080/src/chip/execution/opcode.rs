@@ -10,10 +10,12 @@ pub enum Op {
     Call{sub: u16},
     CallIf(Test, u16),
     CompareWith{ value: u8 },
+    DecrementByte{register: Byte},
     ExchangeDoubleWithHilo, 
     ExchangeTopWithHilo,
     ExclusiveOrWith{value: u8},
     Halt,
+    IncrementByte{register: Byte},
     Jump{to: u16},
     JumpIf(Test, u16),
     LoadExtendedWith{to: Internal, value: u16 },
@@ -166,6 +168,8 @@ mod b11_00_1111 {
 #[disclose]
 #[allow(non_upper_case_globals)]
 mod b11_000_111 {
+    const IncrementRegister: u8 = 0b00_000_100;
+    const DecrementRegister: u8 = 0b00_000_101;
     const JumpIf: u8 = 0b11_000_010;
     const Reset: u8 = 0b11_000_111;
     const ReturnIf: u8 = 0b11_000_000;
@@ -219,6 +223,8 @@ impl TryFrom<[u8;1]> for Op {
             let _value = match value & 0b11_000_111 {
                 b11_000_111::Reset => return Ok(Reset{vector: value >> 3 & 0x07}),
                 b11_000_111::ReturnIf => return Ok(ReturnIf(Test::from(value))),
+                b11_000_111::IncrementRegister => return Ok(IncrementByte { register: Byte::from(value) }),
+                b11_000_111::DecrementRegister => return Ok(DecrementByte { register: Byte::from(value) }),
                 _ => value,
             };
             let _value = match value & 0b11_00_1111 {
@@ -293,7 +299,7 @@ impl Op {
             AddTo{..} | AndWith{..} | ExclusiveOrWith{..} | OrWith{..} | SubtractBy{..} | CompareWith{..} | MoveData{..}
                 => 2,
             NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | 
-            Move{..} | RotateRightCarrying
+            Move{..} | RotateRightCarrying | IncrementByte {..} | DecrementByte {..}
                 => 1,
         }
     }
@@ -340,6 +346,18 @@ mod test {
     fn no_op() {
         let op = decode(&[0x00]).unwrap();
         assert_eq!(op.0, NOP(4));
+    }
+
+    #[test]
+    fn inc() {
+        let op = decode(&[0x1C]).unwrap();
+        assert_eq!(op.0, IncrementByte { register: Byte::Single(Register::E) });
+    }
+
+    #[test]
+    fn dec() {
+        let op = decode(&[0x35, 0x78]).unwrap();
+        assert_eq!(op.0, DecrementByte{ register: Byte::Indirect });
     }
 
     #[test]

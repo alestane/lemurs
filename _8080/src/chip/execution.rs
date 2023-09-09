@@ -97,6 +97,20 @@ impl Op {
                 *chip.update_flags_for(comparison) = borrow;
                 7
             }
+            DecrementByte { register } => {
+                let (value, time) = match chip.resolve_byte(register) {
+                    Byte::Single(reg) => { chip[reg] = chip[reg].wrapping_sub(1); (chip[reg], 5)}
+                    Byte::RAM(address) => { 
+                        let value = bus.read(address).wrapping_sub(1); 
+                        bus.write(value, address);
+                        (value, 10)
+                    }
+                    _ => unreachable!()
+                };
+                *chip.update_flags_for(value) = false;
+                chip.a = (value ^ value.wrapping_add(1)) & 0x10 != 0;
+                time
+            }
             ExchangeDoubleWithHilo => {
                 (chip[Double::DE], chip[Double::HL]) = (chip[Double::HL], chip[Double::DE]);
                 5
@@ -115,6 +129,20 @@ impl Op {
             Halt => {
                 chip.active = false;
                 7
+            }
+            IncrementByte { register } => {
+                let (value, time) = match chip.resolve_byte(register) {
+                    Byte::Single(reg) => { chip[reg] = chip[reg].wrapping_add(1); (chip[reg], 5)}
+                    Byte::RAM(address) => { 
+                        let value = bus.read(address).wrapping_add(1); 
+                        bus.write(value, address);
+                        (value, 10)
+                    }
+                    _ => unreachable!()
+                };
+                *chip.update_flags_for(value) = false;
+                chip.a = (value ^ value.wrapping_sub(1)) & 0x10 != 0;
+                time
             }
             Jump{to} => {
                 chip.pc = to;
@@ -312,6 +340,17 @@ mod test {
     }
 
     #[test]
+    fn dec() {
+        let mut env = Socket::default();
+        let mut chip = State::new();
+        chip[Register::L] = 0x50;
+        DecrementByte { register: Byte::Single(Register::L) }.execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip[Register::L], 0x4F);
+        assert!(chip.a, "aux flag reset");
+        assert!(!chip.p, "parity flag even");
+    }
+
+    #[test]
     fn xthl() {
         let mut env = SimpleBoard::default();
         let mut chip = State::new();
@@ -362,6 +401,19 @@ mod test {
         Halt.execute_on(&mut chip, &mut env).unwrap();
         assert_eq!(chip.pc, 0x2535);
         assert!(!chip.active, "Processor not stopped");
+    }
+
+    #[test]
+    fn inc() {
+        let mut env = Socket::default();
+        let mut chip = State::new();
+        chip[Register::D] = 0x17;
+        IncrementByte { register: Byte::Single(Register::D) }.execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip[Register::D], 0x18);
+        assert!(!chip.a, "Aux flag set\n");
+        assert!(chip.p, "parity flag odd\n");
+        assert!(!chip.m, "sign flag set\n");
+        assert!(!chip.z, "zero flag set\n");
     }
 
     #[test]
