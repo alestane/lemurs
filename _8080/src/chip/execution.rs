@@ -266,6 +266,8 @@ mod test {
     use access::{Double::*, Register::*};
     use crate::{chip::*, SimpleBoard};
     use opcode::{Test::*, Flag::*};
+
+
      #[test]
      fn add() {
         let mut harness = Socket::default();
@@ -377,18 +379,18 @@ mod test {
     fn xor() {
         let mut env = Socket::default();
         let mut chip = State::new();
-        chip[Register::A] = 0b10011100;
+        chip[A] = 0b10011100;
         *chip.update_flags() = true;
         ExclusiveOrWith { value: 0b00111110 }.execute_on(&mut chip, &mut env).unwrap();
-        assert_eq!(chip[Register::A], 0b10100010);
+        assert_eq!(chip[A], 0b10100010);
         assert!(!chip.c, "Carry flag set");
         assert!(!chip.z, "Zero flag set");
         assert!(chip.m, "minus flag reset");
         assert!(!chip.p, "parity flag even");
 
-        chip[Register::D] = 0b10100010;
-        ExclusiveOrWithAccumulator { from: Byte::Single(Register::D) }.execute_on(&mut chip, &mut env).unwrap();
-        assert_eq!(chip[Register::A], 0);
+        chip[D] = 0b10100010;
+        ExclusiveOrWithAccumulator { from: Byte::Single(D) }.execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip[A], 0);
         assert!(chip.z, "Zero flag reset");
         assert!(chip.p, "parity flag odd");
         assert!(!chip.c, "carry flag set");
@@ -399,9 +401,9 @@ mod test {
     fn compare_i() {
         let mut env = Socket::default();
         let mut chip = State::new();
-        chip[Register::A]  = 0b01011011;
+        chip[A]  = 0b01011011;
         CompareWith { value: 0b10100011 }.execute_on(&mut chip, &mut env).unwrap();
-        assert_eq!(chip[Register::A], 0x5B);
+        assert_eq!(chip[A], 0x5B);
         assert!(!chip.a, "Auxilliary carry flag set");
         assert!(chip.c, "Carry flag cleared");
         assert!(!chip.z, "Zero flag set");
@@ -424,9 +426,9 @@ mod test {
     fn inc() {
         let mut env = Socket::default();
         let mut chip = State::new();
-        chip[Register::D] = 0x17;
-        IncrementByte { register: Byte::Single(Register::D) }.execute_on(&mut chip, &mut env).unwrap();
-        assert_eq!(chip[Register::D], 0x18);
+        chip[D] = 0x17;
+        IncrementByte { register: Byte::Single(D) }.execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip[D], 0x18);
         assert!(!chip.a, "Aux flag set\n");
         assert!(chip.p, "parity flag odd\n");
         assert!(!chip.m, "sign flag set\n");
@@ -461,25 +463,25 @@ mod test {
     fn move_() {
         let mut env = SimpleBoard::default();
         let mut chip = State::new();
-        chip[Register::A] = 0x05;
-        chip[Register::H] = 0x02;
-        chip[Register::L] = 0xA4;
-        chip[Register::B] = 0x32;
+        chip[A] = 0x05;
+        chip[H] = 0x02;
+        chip[L] = 0xA4;
+        chip[B] = 0x32;
         env[0x02A4] = 0xD4;
         env[0x0205] = 0xB2;
-        Move{to: Byte::Single(Register::L), from: Byte::Single(Register::A)}.execute_on(&mut chip, &mut env).unwrap();
-        Move{to: Byte::Single(Register::B), from: Byte::Indirect}.execute_on(&mut chip, &mut env).unwrap();
-        assert_eq!(chip[Register::B], 0xB2);
+        Move{to: Byte::Single(L), from: Byte::Single(A)}.execute_on(&mut chip, &mut env).unwrap();
+        Move{to: Byte::Single(B), from: Byte::Indirect}.execute_on(&mut chip, &mut env).unwrap();
+        assert_eq!(chip[B], 0xB2);
     }
 
     #[test]
     fn or() {
         let mut env = Socket::default();
         let mut chip = State::new();
-        chip[Register::A] = 0b01010110;
+        chip[A] = 0b01010110;
         *chip.update_flags() = true;
         OrWith{value: 0b00010101}.execute_on(&mut chip, &mut env).unwrap();
-        assert_eq!(chip[Register::A], 0b01010111);
+        assert_eq!(chip[A], 0b01010111);
         assert!(!chip.c, "carry flag not reset");
         assert!(!chip.z, "zero flag set");
         assert!(!chip.m, "minus flag set");
@@ -550,12 +552,12 @@ mod test {
     fn rotate() {
         let mut env = Socket::default();
         let mut chip = State::new();
-        chip[Register::A] = 0b0111_0101;
+        chip[A] = 0b0111_0101;
         RotateRightCarrying.execute_on(&mut chip, &mut env).unwrap();
-        assert_eq!(chip[Register::A], 0b1011_1010);
+        assert_eq!(chip[A], 0b1011_1010);
         assert!(chip.c, "Carry bit cleared");
         RotateRightCarrying.execute_on(&mut chip, &mut env).unwrap();
-        assert_eq!(chip[Register::A], 0b0101_1101);
+        assert_eq!(chip[A], 0b0101_1101);
         assert!(!chip.c, "Carry bit set");
     }
 
@@ -563,16 +565,16 @@ mod test {
     fn subtract() {
         let mut env = Socket::default();
         let mut chip = State::new();
-        chip[Register::A] = 0b1001_0011;
+        chip[A] = 0b1001_0011;
         SubtractBy{value: 0b1011_0110, carry: false}.execute_on(&mut chip, &mut env).unwrap();
-        assert_eq!(chip[Register::A], 0b1101_1101);
+        assert_eq!(chip[A], 0b1101_1101);
         assert!(!chip.a, "Auxilliary carry flag set");
         assert!(chip.c, "Carry flag cleared");
         assert!(!chip.z, "Zero flag set");
         assert!(chip.m, "Sign flag cleared");
         assert!(chip.p, "Parity flag odd");
         SubtractBy { value: 0b1101_1101, carry: false }.execute_on(&mut chip, &mut env).unwrap();
-        assert_eq!(chip[Register::A], 0b0000_0000);
+        assert_eq!(chip[A], 0b0000_0000);
         assert!(chip.a, "Auxilliary carry flag clear");
         assert!(!chip.c, "Carry flag set");
         assert!(chip.z, "Zero flag cleared");
@@ -580,7 +582,7 @@ mod test {
         assert!(chip.p, "Parity flag odd");
         chip.c = true;
         SubtractBy { value: 0b0011_1100, carry: true }.execute_on(&mut chip, &mut env).unwrap();
-        assert_eq!(chip[Register::A], 0b1100_0011);
+        assert_eq!(chip[A], 0b1100_0011);
         assert!(chip.c, "carry flag reset");
         assert!(!chip.z, "zero flag set");
         assert!(chip.m, "sign flag reset");
