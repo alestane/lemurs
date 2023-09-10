@@ -6,6 +6,7 @@ use crate::{convert::TryFrom, chip::access::{Byte, Register, Word, Double, Inter
 pub enum Op {
     NOP(u8),
     AddTo{value: u8, carry: bool},
+    Add{from: Byte, carry: bool},
     AndWith{value: u8},
     Call{sub: u16},
     CallIf(Test, u16),
@@ -14,7 +15,7 @@ pub enum Op {
     ExchangeDoubleWithHilo, 
     ExchangeTopWithHilo,
     ExclusiveOrWith{value: u8},
-    ExclusiveOrWithAccumulator{ from: Byte },
+    ExclusiveOr{ from: Byte },
     Halt,
     IncrementByte{register: Byte},
     Jump{to: u16},
@@ -181,6 +182,7 @@ mod b11_000_111 {
 #[disclose]
 #[allow(non_upper_case_globals)]
 mod b11_111_000 {
+    const AddToAccumulator: u8  = 0b10_000_000;
     const ExclusiveOrWithAccumulator: u8    = 0b10_101_000;
 }
 
@@ -240,7 +242,8 @@ impl TryFrom<[u8;1]> for Op {
                 _ => value,
             };
             let _value = match value & 0b11_111_000 {
-                b11_111_000::ExclusiveOrWithAccumulator => return Ok(ExclusiveOrWithAccumulator { from: Byte::from(value << 3) }),
+                b11_111_000::AddToAccumulator => return Ok(Add{from: Byte::from(value << 3), carry: false}),
+                b11_111_000::ExclusiveOrWithAccumulator => return Ok(ExclusiveOr { from: Byte::from(value << 3) }),
                 _ => value,
             };
             let _value = match value & 0b11_000000 {
@@ -310,7 +313,7 @@ impl Op {
             AddTo{..} | AndWith{..} | ExclusiveOrWith{..} | OrWith{..} | SubtractBy{..} | CompareWith{..} | MoveData{..}
                 => 2,
             NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | 
-            Move{..} | RotateRightCarrying | IncrementByte {..} | DecrementByte {..} | ExclusiveOrWithAccumulator{..}
+            Move{..} | RotateRightCarrying | IncrementByte {..} | DecrementByte {..} | Add{..} | ExclusiveOr{..}
                 => 1,
         }
     }

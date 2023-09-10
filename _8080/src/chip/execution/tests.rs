@@ -3,35 +3,49 @@ use access::{Double::*, Register::*};
 use crate::{chip::*, SimpleBoard};
 use opcode::{Test::*, Flag::*};
 
+macro_rules! flag_name {
+    ( m ) => ( "Sign" );
+    ( c ) => ( "Carry" );
+    ( z ) => ( "Zero" );
+    ( p ) => ( "Parity" );
+    ( a ) => ( "Aux" );
+}
+
+macro_rules! assert_flags {
+    { $host:expr $(, !$flag:ident )+ } => {
+        $(assert!(!$host.$flag, "{} flag set\n", flag_name!($flag)));+
+    };
+    { $host:expr $(, $flag:ident )+ } => {
+        $(assert!($host.$flag, "{} flag reset\n", flag_name!($flag)));+
+    }
+}
+
 #[test]
 fn add() {
-    let mut harness = Socket::default();
+    let mut env = Socket::default();
     let mut chip = State::new();
     chip[Register::A] = 0x75;
-    AddTo { value: 0x49, carry: false }.execute_on(&mut chip, &mut harness).unwrap();
+    AddTo { value: 0x49, carry: false }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip.register[6], 0xBE);
-    assert!(!chip.a, "aux carry was {}", chip.a);
-    assert!(!chip.c, "carry was {}", chip.c);
-    assert!(!chip.z, "zero bit was {}", chip.z);
-    assert!(chip.m, "sign bit was {}", chip.m);
-    assert!(chip.p, "parity bit was {}", chip.p);
+    assert_flags!(chip, !a, !c, !z);
+    assert_flags!{chip, m, p};
 
-    AddTo { value: 0x43, carry: false }.execute_on(&mut chip, &mut harness).unwrap();
+    AddTo { value: 0x43, carry: false }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip.register[6], 0x01, "Sum was {}", chip.register[6]);
-    assert!(chip.a, "aux carry was {}", chip.a);
-    assert!(chip.c, "carry was {}", chip.c);
-    assert!(!chip.z, "zero bit was {}", chip.z);
-    assert!(!chip.m, "sign bit was {}", chip.m);
-    assert!(!chip.p, "parity bit was {}", chip.p);
+    assert_flags!(chip, a, c);
+    assert_flags!(chip, !z, !m, !p);
 
-    AddTo { value: 0x7E, carry: true }.execute_on(&mut chip, &mut harness).unwrap();
+    AddTo { value: 0x7E, carry: true }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip.register[6], 0x80, "Sum was {}", chip.register[6]);
-    assert!(chip.a, "aux carry was {}", chip.a);
-    assert!(!chip.c, "carry was {}", chip.c);
-    assert!(!chip.z, "zero bit was {}", chip.z);
-    assert!(chip.m, "sign bit was {}", chip.m);
-    assert!(!chip.p, "parity bit was {}", chip.p);
-    }
+    assert_flags!(chip, a, m);
+    assert_flags!(chip, !c, !z, !p);
+
+    chip[Register::L] = 0x5A;
+    Add{from:Byte::Single(Register::L), carry: false}.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[Register::A], 0xDA);
+    assert_flags!(chip, !a, !c, !z, !p);
+    assert_flags!(chip, m);
+}
 
 #[test]
 fn and() {
@@ -40,20 +54,14 @@ fn and() {
     chip[Register::A] = 0b01011101;
     AndWith { value: 0b11011011 }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip.register[6], 0b01011001);
-    assert!(!chip.a, "aux carry was {}", chip.a);
-    assert!(!chip.c, "carry was {}", chip.c);
-    assert!(!chip.z, "zero bit was {}", chip.z);
-    assert!(!chip.m, "sign bit was {}", chip.m);
-    assert!(chip.p, "parity bit was {}", chip.p);
+    assert_flags!(chip, !a, !c, !z, !m);
+    assert_flags!(chip, p);
 
     AndWith { value: 0b10100100 }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip.register[6], 0b00000000);
-    assert!(!chip.a, "aux carry was {}", chip.a);
-    assert!(!chip.c, "carry was {}", chip.c);
-    assert!(chip.z, "zero bit was {}", chip.z);
-    assert!(!chip.m, "sign bit was {}", chip.m);
-    assert!(chip.p, "parity bit was {}", chip.p);
-    }
+    assert_flags!(chip, !a, !c, !m);
+    assert_flags!(chip, z, p);
+}
 
     #[test]
 fn call() {
@@ -92,8 +100,8 @@ fn dec() {
     chip[Register::L] = 0x50;
     DecrementByte { register: Byte::Single(Register::L) }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[Register::L], 0x4F);
-    assert!(chip.a, "aux flag reset");
-    assert!(!chip.p, "parity flag even");
+    assert_flags!(chip, a);
+    assert_flags!(chip, !p);
 }
 
 #[test]
@@ -118,18 +126,14 @@ fn xor() {
     *chip.update_flags() = true;
     ExclusiveOrWith { value: 0b00111110 }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A], 0b10100010);
-    assert!(!chip.c, "Carry flag set");
-    assert!(!chip.z, "Zero flag set");
-    assert!(chip.m, "minus flag reset");
-    assert!(!chip.p, "parity flag even");
+    assert_flags!(chip, !c, !z, !p);
+    assert_flags!(chip, m);
 
     chip[D] = 0b10100010;
-    ExclusiveOrWithAccumulator { from: Byte::Single(D) }.execute_on(&mut chip, &mut env).unwrap();
+    ExclusiveOr { from: Byte::Single(D) }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A], 0);
-    assert!(chip.z, "Zero flag reset");
-    assert!(chip.p, "parity flag odd");
-    assert!(!chip.c, "carry flag set");
-    assert!(!chip.m, "sign flag set");
+    assert_flags!(chip, z, p);
+    assert_flags!(chip, !c, !m);
 }
 
 #[test]
@@ -139,11 +143,8 @@ fn compare_i() {
     chip[A]  = 0b01011011;
     CompareWith { value: 0b10100011 }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A], 0x5B);
-    assert!(!chip.a, "Auxilliary carry flag set");
-    assert!(chip.c, "Carry flag cleared");
-    assert!(!chip.z, "Zero flag set");
-    assert!(chip.m, "Sign flag cleared");
-    assert!(chip.p, "Parity flag odd");
+    assert_flags!(chip, c, m, p);
+    assert_flags!(chip, !a, !z);
 }
 
 #[test]
@@ -164,10 +165,8 @@ fn inc() {
     chip[D] = 0x17;
     IncrementByte { register: Byte::Single(D) }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[D], 0x18);
-    assert!(!chip.a, "Aux flag set\n");
-    assert!(chip.p, "parity flag odd\n");
-    assert!(!chip.m, "sign flag set\n");
-    assert!(!chip.z, "zero flag set\n");
+    assert_flags!(chip, !a, !m, !z);
+    assert_flags!(chip, p);
 }
 
 #[test]
@@ -217,10 +216,7 @@ fn or() {
     *chip.update_flags() = true;
     OrWith{value: 0b00010101}.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A], 0b01010111);
-    assert!(!chip.c, "carry flag not reset");
-    assert!(!chip.z, "zero flag set");
-    assert!(!chip.m, "minus flag set");
-    assert!(!chip.p, "parity flag even");
+    assert_flags!(chip, !c, !z, !m, !p);
 }
 
 #[test]
@@ -290,10 +286,10 @@ fn rotate() {
     chip[A] = 0b0111_0101;
     RotateRightCarrying.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A], 0b1011_1010);
-    assert!(chip.c, "Carry bit cleared");
+    assert_flags!(chip, c);
     RotateRightCarrying.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A], 0b0101_1101);
-    assert!(!chip.c, "Carry bit set");
+    assert_flags!(chip, !c);
 }
 
 #[test]
@@ -303,25 +299,17 @@ fn subtract() {
     chip[A] = 0b1001_0011;
     SubtractBy{value: 0b1011_0110, carry: false}.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A], 0b1101_1101);
-    assert!(!chip.a, "Auxilliary carry flag set");
-    assert!(chip.c, "Carry flag cleared");
-    assert!(!chip.z, "Zero flag set");
-    assert!(chip.m, "Sign flag cleared");
-    assert!(chip.p, "Parity flag odd");
+    assert_flags!(chip, c, m, p);
+    assert_flags!(chip, !a, !z);
     SubtractBy { value: 0b1101_1101, carry: false }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A], 0b0000_0000);
-    assert!(chip.a, "Auxilliary carry flag clear");
-    assert!(!chip.c, "Carry flag set");
-    assert!(chip.z, "Zero flag cleared");
-    assert!(!chip.m, "Sign flag set");
-    assert!(chip.p, "Parity flag odd");
+    assert_flags!(chip, a, z, p);
+    assert_flags!(chip, !c, !m);
     chip.c = true;
     SubtractBy { value: 0b0011_1100, carry: true }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A], 0b1100_0011);
-    assert!(chip.c, "carry flag reset");
-    assert!(!chip.z, "zero flag set");
-    assert!(chip.m, "sign flag reset");
-    assert!(chip.p, "parity flag odd");
+    assert_flags!(chip, c, m, p);
+    assert_flags!(chip, !z);
 }
 
 #[test]

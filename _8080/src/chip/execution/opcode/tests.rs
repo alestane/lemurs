@@ -47,7 +47,7 @@ fn xor() {
     let op = decode(&[0xEE, 0x4D]).unwrap();
     assert_eq!(op.0, ExclusiveOrWith { value: 0x4D });
     let op = decode(&[0xA9]).unwrap();
-    assert_eq!(op.0, ExclusiveOrWithAccumulator { from: Byte::Single(Register::C) });
+    assert_eq!(op.0, ExclusiveOr { from: Byte::Single(Register::C) });
 }
 
 #[test]
@@ -125,13 +125,15 @@ fn call() {
 }
 
 #[test]
-fn adi() {
+fn add() {
     let op = decode(&[0xC6, 0x39, 0x02]).unwrap();
     assert_eq!(op.0, AddTo { value: 0x39, carry: false });
     let fail = decode(&[0xC6]).unwrap_err();
     assert_eq!(fail, Error::Invalid([0xC6]));
     let op = decode(&[0xCE, 0x72]).unwrap();
     assert_eq!(op.0, AddTo{value: 0x72, carry: true});
+    let op = decode(&[0x84, 0x87]).unwrap();
+    assert_eq!(op.0, Add{from: Byte::Single(Register::H), carry: false});
 }
 
 #[test]
@@ -173,7 +175,7 @@ fn subtract() {
 }
 
 #[test]
-fn compare_i() {
+fn compare() {
     let op = decode(&[0xFE, 0x2B]).unwrap();
     assert_eq!(op.1, 2);
     assert_eq!(op.0, CompareWith{value: 0x2B});

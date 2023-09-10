@@ -65,6 +65,15 @@ impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
 impl Op {
     fn execute_on<H: Harness>(self, chip: &mut State, mut bus: impl DerefMut<Target = H>) -> OpOutcome {
         let cycles = match self {
+            Add { from, carry } => {
+                let (value, time) = match chip.resolve_byte(from) {
+                    Byte::Single(register) => (chip[register], 4),
+                    Byte::RAM(address) => ( bus.read(address), 7),
+                    _ => unreachable!(),
+                };
+                AddTo{value, carry}.execute_on(chip, bus)?;
+                time
+            }
             AddTo { value, carry } => {
                 let carry_in = chip.c && carry;
                 let accumulator = &mut chip[Register::A];
@@ -121,12 +130,7 @@ impl Op {
                 bus.write_word(out, chip.sp);
                 18
             }
-            ExclusiveOrWith { value } => {
-                chip[Register::A] ^= value;
-                *chip.update_flags() = false;
-                7
-            }
-            ExclusiveOrWithAccumulator { from } => {
+            ExclusiveOr { from } => {
                 let (value, time) = match chip.resolve_byte(from) {
                     Byte::Single(register) => (chip[register], 4),
                     Byte::RAM(addr) => (bus.read(addr), 7),
@@ -134,6 +138,11 @@ impl Op {
                 };
                 ExclusiveOrWith{value}.execute_on(chip, bus)?;
                 time
+            }
+            ExclusiveOrWith { value } => {
+                chip[Register::A] ^= value;
+                *chip.update_flags() = false;
+                7
             }
             Halt => {
                 chip.active = false;
