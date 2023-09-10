@@ -14,8 +14,8 @@ pub enum Op {
     DecrementByte{register: Byte},
     ExchangeDoubleWithHilo, 
     ExchangeTopWithHilo,
-    ExclusiveOrWith{value: u8},
     ExclusiveOr{ from: Byte },
+    ExclusiveOrWith{value: u8},
     Halt,
     IncrementByte{register: Byte},
     Jump{to: u16},
@@ -30,6 +30,7 @@ pub enum Op {
     Return,
     ReturnIf(Test),
     RotateRightCarrying,
+    Subtract{from: Byte, carry: bool},
     SubtractBy{value: u8, carry: bool},
 }
 use Op::*;
@@ -184,6 +185,7 @@ mod b11_000_111 {
 mod b11_111_000 {
     const AddToAccumulator: u8  = 0b10_000_000;
     const ExclusiveOrWithAccumulator: u8    = 0b10_101_000;
+    const SubtractFromAccumulator: u8   = 0b10_01_0000;
 }
 
 #[disclose]
@@ -244,6 +246,7 @@ impl TryFrom<[u8;1]> for Op {
             let _value = match value & 0b11_111_000 {
                 b11_111_000::AddToAccumulator => return Ok(Add{from: Byte::from(value << 3), carry: false}),
                 b11_111_000::ExclusiveOrWithAccumulator => return Ok(ExclusiveOr { from: Byte::from(value << 3) }),
+                b11_111_000::SubtractFromAccumulator => return Ok(Subtract{ from: Byte::from(value << 3), carry: false}),
                 _ => value,
             };
             let _value = match value & 0b11_000000 {
@@ -313,7 +316,7 @@ impl Op {
             AddTo{..} | AndWith{..} | ExclusiveOrWith{..} | OrWith{..} | SubtractBy{..} | CompareWith{..} | MoveData{..}
                 => 2,
             NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | 
-            Move{..} | RotateRightCarrying | IncrementByte {..} | DecrementByte {..} | Add{..} | ExclusiveOr{..}
+            Move{..} | RotateRightCarrying | IncrementByte {..} | DecrementByte {..} | Add{..} | ExclusiveOr{..} |Subtract{..}
                 => 1,
         }
     }

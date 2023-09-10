@@ -248,6 +248,15 @@ impl Op {
                 chip[Register::A] = accumulator.rotate_right(1);
                 4
             }
+            Subtract { from, carry } => {
+                let (value, time) = match chip.resolve_byte(from) {
+                    Byte::Single(register) => (chip[register], 4),
+                    Byte::RAM(address) => ( bus.read(address), 7),
+                    _ => unreachable!(),
+                };
+                SubtractBy{value, carry}.execute_on(chip, bus)?;
+                time
+            }
             SubtractBy{ value, carry } => {
                 let carry = chip.c && carry;
                 let accumulator = &mut chip[Register::A];
