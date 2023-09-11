@@ -99,11 +99,13 @@ fn return_if() {
 }
 
 #[test]
-fn load_xi() {
+fn transfer() {
     let op = decode(&[0x31, 0x25, 0x02]).unwrap();
     assert_eq!(op.0, LoadExtendedWith { to: Internal::StackPointer, value: 549 });
     let fail = decode(&[0x11, 0x21]).unwrap_err();
     assert_eq!(fail, Error::InvalidPair([0x11, 0x21]));
+    let op = decode(&[0x32, 0x67, 0x9A]).unwrap();
+    assert_eq!(op.0, StoreAccumulator { address: 0x9A67 });
 }
 
 #[test]

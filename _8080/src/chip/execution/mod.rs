@@ -290,6 +290,10 @@ impl Op {
                 chip[Register::A] = accumulator.rotate_right(1);
                 4
             }
+            StoreAccumulator { address } => {
+                bus.write(chip[Register::A], address);
+                13
+            }
             Subtract { from, carry } => {
                 let (value, time) = match chip.resolve_byte(from) {
                     Byte::Single(register) => (chip[register], 4),

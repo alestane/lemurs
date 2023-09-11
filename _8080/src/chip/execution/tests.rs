@@ -221,12 +221,16 @@ fn jump() {
 }
 
 #[test]
-fn load_xi() {
+fn transfer() {
     let mut env = Socket::default();
     let mut chip = State::new();
     LoadExtendedWith { to: Internal::Wide(HL), value: 0x6472 }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip.register[4], 0x72);
     assert_eq!(chip.register[5], 0x64);
+    let mut env = SimpleBoard::default();
+    chip.register[6] = 0x5D;
+    StoreAccumulator { address: 0x59D3 }.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(env[0x59D3], 0x5D);
 }
 
 #[test]

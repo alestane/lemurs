@@ -35,6 +35,7 @@ pub enum Op {
     Return,
     ReturnIf(Test),
     RotateRightCarrying,
+    StoreAccumulator{address: u16},
     Subtract{from: Byte, carry: bool},
     SubtractBy{value: u8, carry: bool},
 }
@@ -133,6 +134,8 @@ mod b11111111 {
     const RotateRightCarrying: u8       = 0b00001111;
     const RotateAccumulatorLeft: u8     = 0b00010111;
     const RotateAccumulatorRight: u8    = 0b00011111;
+
+    const StoreAccumulatorDirect: u8    = 0b00110010;
 
     const DecimalAddAdjust: u8      = 0b00100111;
     const ComplementAccumulator: u8 = 0b00101111;
@@ -309,6 +312,7 @@ impl TryFrom<[u8;3]> for Op {
         let action = value[0];
         let data = u16::from_le_bytes([value[1], value[2]]);
         match action {
+            b11111111::StoreAccumulatorDirect => return Ok(StoreAccumulator { address: data }),
             b11111111::Jump => return Ok(Jump{to: data}),
             b11111111::Call => return Ok(Call{sub: data}),
             _ => action,
@@ -330,7 +334,7 @@ impl Op {
     pub fn len(&self) -> u8 {
         match self {
             Call{..} | CallIf(..) | Jump{..} | JumpIf(..) | 
-            LoadExtendedWith{..} | ReturnIf(..) 
+            LoadExtendedWith{..} | ReturnIf(..) | StoreAccumulator{..}
                 => 3,
             AddTo{..} | AndWith{..} | ExclusiveOrWith{..} | OrWith{..} | SubtractBy{..} | CompareWith{..} | MoveData{..}
                 => 2,
