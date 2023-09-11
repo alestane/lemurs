@@ -187,6 +187,10 @@ impl Op {
                 chip.a = (value ^ value.wrapping_sub(1)) & 0x10 != 0;
                 time
             }
+            IncrementWord { register } => {
+                chip[register] = chip[register].wrapping_add(1);
+                5
+            }
             Jump{to} => {
                 chip.pc = to;
                 10

@@ -28,6 +28,8 @@ fn no_op() {
 fn inc() {
     let op = decode(&[0x1C]).unwrap();
     assert_eq!(op.0, IncrementByte { register: Byte::Single(Register::E) });
+    let op = decode(&[0x23]).unwrap();
+    assert_eq!(op.0, IncrementWord { register: Internal::Wide(Double::HL) });
 }
 
 #[test]

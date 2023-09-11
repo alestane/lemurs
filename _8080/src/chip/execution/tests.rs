@@ -197,6 +197,9 @@ fn inc() {
     assert_eq!(chip[D], 0x18);
     assert_flags!(chip, !a, !m, !z);
     assert_flags!(chip, p);
+    chip[E] = 0xFF;
+    IncrementWord{register: Internal::Wide(DE)}.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[DE], 0x1900);
 }
 
 #[test]
