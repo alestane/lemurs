@@ -176,6 +176,8 @@ fn subtract() {
     assert_eq!(op.0, SubtractBy{value: 0x9E, carry: true});
     let op = decode(&[0x95]).unwrap();
     assert_eq!(op.0, Subtract{from: Byte::Single(Register::L), carry: false});
+    let op = decode(&[0x9E]).unwrap();
+    assert_eq!(op.0, Subtract{from: Byte::Indirect, carry: true});
 }
 
 #[test]

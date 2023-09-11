@@ -258,13 +258,13 @@ impl Op {
                 time
             }
             SubtractBy{ value, carry } => {
-                let carry = chip.c && carry;
+                let value = (!value.wrapping_add((chip.c && carry) as u8)).wrapping_add(1);
                 let accumulator = &mut chip[Register::A];
                 let aux = *accumulator ^ value;
-                let (value, carry) = accumulator.overflowing_sub(value.wrapping_add(carry as u8));
+                let (value, carry) = accumulator.overflowing_add(value);
                 *accumulator = value;
-                *chip.update_flags() = carry;
-                chip.a = (value ^ aux) & 0x10 == 0;
+                *chip.update_flags() = !carry;
+                chip.a = (value ^ aux) & 0x10 != 0;
                 7
             }
             NOP(n) => n,

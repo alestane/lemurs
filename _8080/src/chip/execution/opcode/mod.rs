@@ -187,6 +187,7 @@ mod b11_111_000 {
     const AddCarryingToAccumulator : u8 = 0b10_001_000;
     const ExclusiveOrWithAccumulator: u8    = 0b10_101_000;
     const SubtractFromAccumulator: u8   = 0b10_010_000;
+    const SubtractBorrowingFromAccumulator: u8  = 0b10_011_000;
 }
 
 #[disclose]
@@ -249,6 +250,7 @@ impl TryFrom<[u8;1]> for Op {
                 b11_111_000::AddCarryingToAccumulator => return Ok(Add{ from: Byte::from(value << 3), carry: true}),
                 b11_111_000::ExclusiveOrWithAccumulator => return Ok(ExclusiveOr { from: Byte::from(value << 3) }),
                 b11_111_000::SubtractFromAccumulator => return Ok(Subtract{ from: Byte::from(value << 3), carry: false}),
+                b11_111_000::SubtractBorrowingFromAccumulator => return Ok(Subtract{ from: Byte::from(value << 3), carry: true}),
                 _ => value,
             };
             let _value = match value & 0b11_000000 {

@@ -321,11 +321,22 @@ fn subtract() {
     assert_eq!(chip[A], 0b1100_0011);
     assert_flags!(chip, c, m, p);
     assert_flags!(chip, !z);
+
     chip[Register::C] = 0b0001_0101;
     Subtract{from: Byte::Single(Register::C), carry: false}.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[Register::A], 0b1010_1110);
     assert_flags!(chip, m);
     assert_flags!(chip, !c, !z, !a, !p);
+
+    chip[Register::L] = 0b0100_1001;
+    Subtract{ from: Byte::Single(Register::L), carry: true}.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[Register::A], 0b0110_0101);
+    assert_flags!(chip, a, p);
+    assert_flags!(chip, !c, !z, !m);
+    chip.c = true;
+    Subtract{from: Byte::Single(Register::C), carry: true}.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[Register::A], 0b0100_1111);
+    assert_flags!(chip, !a, !c, !z, !m, !p);
 }
 
 #[test]
