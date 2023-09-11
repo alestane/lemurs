@@ -208,6 +208,15 @@ impl Op {
                     Byte::Indirect => unreachable!()
                 }
             }
+            Or{from} => {
+                let (value, time) = match chip.resolve_byte(from) {
+                    Byte::Single(register) => (chip[register], 4),
+                    Byte::RAM(address) => (bus.read(address), 7),
+                    _ => unreachable!()
+                };
+                OrWith{value}.execute_on(chip, bus)?;
+                time
+            }
             OrWith{value} => {
                 chip[Register::A] |= value;
                 *chip.update_flags() = false;

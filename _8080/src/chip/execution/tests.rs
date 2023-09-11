@@ -235,6 +235,11 @@ fn or() {
     OrWith{value: 0b00010101}.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A], 0b01010111);
     assert_flags!(chip, !c, !z, !m, !p);
+    chip[H] = 0b1100_1001;
+    Or{from: Byte::Single(H)}.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[A], 0b1101_1111);
+    assert_flags!(chip, m);
+    assert_flags!(chip, !c, !z, !p);
 }
 
 #[test]

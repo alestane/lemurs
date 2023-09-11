@@ -56,6 +56,8 @@ fn xor() {
 fn or() {
     let op = decode(&[0xF6, 0x23]).unwrap();
     assert_eq!(op.0, OrWith{value: 0x23});
+    let op = decode(&[0xB2]).unwrap();
+    assert_eq!(op.0, Or{from: Byte::Single(Register::D)});
 }
 
 #[test]
