@@ -145,6 +145,10 @@ impl Op {
                 chip.a = (value ^ value.wrapping_add(1)) & 0x10 != 0;
                 time
             }
+            DecrementWord{register} => {
+                chip[register] = chip[register].wrapping_sub(1);
+                5
+            }
             ExchangeDoubleWithHilo => {
                 (chip[Double::DE], chip[Double::HL]) = (chip[Double::HL], chip[Double::DE]);
                 5

@@ -14,13 +14,14 @@ pub enum Op {
     Compare{from: Byte},
     CompareWith{ value: u8 },
     DecrementByte{register: Byte},
+    DecrementWord{register: Internal},
     ExchangeDoubleWithHilo, 
     ExchangeTopWithHilo,
     ExclusiveOr{ from: Byte },
     ExclusiveOrWith{value: u8},
     Halt,
-    IncrementWord{register: Internal},
     IncrementByte{register: Byte},
+    IncrementWord{register: Internal},
     Jump{to: u16},
     JumpIf(Test, u16),
     LoadExtendedWith{to: Internal, value: u16 },
@@ -169,6 +170,7 @@ mod b11111111 {
 mod b11_00_1111 {
     const LoadExtendedImmediate: u8 = 0b00_00_0001;
     const IncrementExtended: u8 = 0b00_00_0011;
+    const DecrementExtended: u8 = 0b00_00_1011;
     const Push: u8  = 0b11_00_0101;
     const Pop: u8 = 0b11_00_0001;
 }
@@ -249,6 +251,7 @@ impl TryFrom<[u8;1]> for Op {
                 _ => value,
             };
             let _value = match value & 0b11_00_1111 {
+                b11_00_1111::DecrementExtended => return Ok(DecrementWord{register: Internal::from(value)}),
                 b11_00_1111::IncrementExtended => return Ok(IncrementWord { register: Internal::from(value) }),
                 b11_00_1111::Push => return Ok(Push(match Internal::from(value) { Internal::StackPointer => Word::ProgramStatus, wide => Word::OnBoard(wide)})),
                 b11_00_1111::Pop => return Ok(Pop(match Internal::from(value) { Internal::StackPointer => Word::ProgramStatus, wide => Word::OnBoard(wide)})),
@@ -333,7 +336,7 @@ impl Op {
                 => 2,
             NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | 
             Move{..} | RotateRightCarrying | IncrementByte {..} | DecrementByte {..} | Add{..}  | Subtract{..} |
-            And{..} | ExclusiveOr{..} | Or{..} | Compare{..} | IncrementWord{..}
+            And{..} | ExclusiveOr{..} | Or{..} | Compare{..} | IncrementWord{..} | DecrementWord {..}
                 => 1,
         }
     }

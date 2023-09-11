@@ -36,6 +36,8 @@ fn inc() {
 fn dec() {
     let op = decode(&[0x35, 0x78]).unwrap();
     assert_eq!(op.0, DecrementByte{ register: Byte::Indirect });
+    let op = decode(&[0x1B]).unwrap();
+    assert_eq!(op.0, DecrementWord{register: Internal::Wide(Double::DE)});
 }
 
 #[test]

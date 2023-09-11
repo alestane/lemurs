@@ -120,6 +120,9 @@ fn dec() {
     assert_eq!(chip[Register::L], 0x4F);
     assert_flags!(chip, a);
     assert_flags!(chip, !p);
+    chip[Register::H] = 0x4C;
+    DecrementWord { register: Internal::Wide(Double::HL) }.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[Double::HL], 0x4C4E);
 }
 
 #[test]
