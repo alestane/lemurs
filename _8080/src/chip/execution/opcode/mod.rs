@@ -184,8 +184,9 @@ mod b11_000_111 {
 #[allow(non_upper_case_globals)]
 mod b11_111_000 {
     const AddToAccumulator: u8  = 0b10_000_000;
+    const AddCarryingToAccumulator : u8 = 0b10_001_000;
     const ExclusiveOrWithAccumulator: u8    = 0b10_101_000;
-    const SubtractFromAccumulator: u8   = 0b10_01_0000;
+    const SubtractFromAccumulator: u8   = 0b10_010_000;
 }
 
 #[disclose]
@@ -245,6 +246,7 @@ impl TryFrom<[u8;1]> for Op {
             };
             let _value = match value & 0b11_111_000 {
                 b11_111_000::AddToAccumulator => return Ok(Add{from: Byte::from(value << 3), carry: false}),
+                b11_111_000::AddCarryingToAccumulator => return Ok(Add{ from: Byte::from(value << 3), carry: true}),
                 b11_111_000::ExclusiveOrWithAccumulator => return Ok(ExclusiveOr { from: Byte::from(value << 3) }),
                 b11_111_000::SubtractFromAccumulator => return Ok(Subtract{ from: Byte::from(value << 3), carry: false}),
                 _ => value,

@@ -134,6 +134,8 @@ fn add() {
     assert_eq!(op.0, AddTo{value: 0x72, carry: true});
     let op = decode(&[0x84, 0x87]).unwrap();
     assert_eq!(op.0, Add{from: Byte::Single(Register::H), carry: false});
+    let op = decode(&[0x89]).unwrap();
+    assert_eq!(op.0, Add{from: Byte::Single(Register::C), carry: true });
 }
 
 #[test]

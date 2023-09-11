@@ -45,6 +45,17 @@ fn add() {
     assert_eq!(chip[Register::A], 0xDA);
     assert_flags!(chip, !a, !c, !z, !p);
     assert_flags!(chip, m);
+
+    chip.c = true;
+    chip[E] = 0b0001_1100;
+    Add{from: Byte::Single(E), carry: true}.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[A], 0b1111_0111);
+    assert_flags!(chip, a, m);
+    assert_flags!(chip, !c, !z, !p);
+    Add{from: Byte::Single(L), carry: true}.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[A], 0b0101_0001);
+    assert_flags!(chip, a, c);
+    assert_flags!(chip, !z, !p, !m);
 }
 
 #[test]
