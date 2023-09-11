@@ -231,6 +231,9 @@ fn transfer() {
     chip.register[6] = 0x5D;
     StoreAccumulator { address: 0x59D3 }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(env[0x59D3], 0x5D);
+    env[0x6275] = 0x6A;
+    LoadAccumulator { address: 0x6275 }.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[Register::A], 0x6A);
 }
 
 #[test]

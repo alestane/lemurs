@@ -24,6 +24,7 @@ pub enum Op {
     IncrementWord{register: Internal},
     Jump{to: u16},
     JumpIf(Test, u16),
+    LoadAccumulator{address: u16},
     LoadExtendedWith{to: Internal, value: u16 },
     Move{to: Byte, from: Byte},
     MoveData{value: u8, to: Byte},
@@ -136,6 +137,7 @@ mod b11111111 {
     const RotateAccumulatorRight: u8    = 0b00011111;
 
     const StoreAccumulatorDirect: u8    = 0b00110010;
+    const LoadAccumulatorDirect: u8 = 0b00111010;
 
     const DecimalAddAdjust: u8      = 0b00100111;
     const ComplementAccumulator: u8 = 0b00101111;
@@ -312,6 +314,7 @@ impl TryFrom<[u8;3]> for Op {
         let action = value[0];
         let data = u16::from_le_bytes([value[1], value[2]]);
         match action {
+            b11111111::LoadAccumulatorDirect => return Ok(LoadAccumulator { address: data }),
             b11111111::StoreAccumulatorDirect => return Ok(StoreAccumulator { address: data }),
             b11111111::Jump => return Ok(Jump{to: data}),
             b11111111::Call => return Ok(Call{sub: data}),
@@ -334,7 +337,7 @@ impl Op {
     pub fn len(&self) -> u8 {
         match self {
             Call{..} | CallIf(..) | Jump{..} | JumpIf(..) | 
-            LoadExtendedWith{..} | ReturnIf(..) | StoreAccumulator{..}
+            LoadExtendedWith{..} | ReturnIf(..) | StoreAccumulator{..} | LoadAccumulator {..}
                 => 3,
             AddTo{..} | AndWith{..} | ExclusiveOrWith{..} | OrWith{..} | SubtractBy{..} | CompareWith{..} | MoveData{..}
                 => 2,

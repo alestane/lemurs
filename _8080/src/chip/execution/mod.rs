@@ -203,6 +203,10 @@ impl Op {
                 if test.approves(chip) { chip.pc = addr; }
                 10
             }
+            LoadAccumulator{address} => {
+                chip[Register::A] = bus.read(address);
+                13
+            }
             LoadExtendedWith { to, value } => {
                 chip[to] = value;
                 10
