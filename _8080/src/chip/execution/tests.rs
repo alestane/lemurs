@@ -155,14 +155,26 @@ fn xor() {
 }
 
 #[test]
-fn compare_i() {
+fn compare() {
     let mut env = Socket::default();
     let mut chip = State::new();
     chip[A]  = 0b01011011;
-    CompareWith { value: 0b10100011 }.execute_on(&mut chip, &mut env).unwrap();
+    CompareWith { value: 0b1010_0011 }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A], 0x5B);
-    assert_flags!(chip, c, m, p);
-    assert_flags!(chip, !a, !z);
+    assert_flags!(chip, a, c, m, p);
+    assert_flags!(chip, !z);
+    chip[L] = 0b0010_0110;
+    Compare{from: Byte::Single(L)}.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[A], 0x5B);
+    assert_flags!(chip, a, p);
+    assert_flags!(chip, !c, !m, !z);
+    chip[A] = 0xF5;
+    CompareWith{value: 0}.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[A], 0xF5);
+    // 1111 0101
+    // 0000 0000
+    assert_flags!(chip, p, m);
+    assert_flags!(chip, !a, !z, !c);
 }
 
 #[test]

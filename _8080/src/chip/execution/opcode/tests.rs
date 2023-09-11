@@ -191,4 +191,6 @@ fn compare() {
     assert_eq!(op.0, CompareWith{value: 0x2B});
     let fail = decode(&[0xFE]).unwrap_err();
     assert_eq!(fail, Error::Invalid([0xFE]));
+    let op = decode(&[0xBF]).unwrap();
+    assert_eq!(op.0, Compare{from: Byte::Single(Register::A)});
 }

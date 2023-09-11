@@ -62,6 +62,13 @@ impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
     }
     }
 
+fn subtract(base: u8, by: u8) -> (u8, bool, bool) {
+    let value = (!by).wrapping_add(1);
+    let aux = base ^ value;
+    let (value, carry) = base.overflowing_add(value);
+    (value, by != 0 && !carry, (value ^ aux) & 0x10 != 0)
+}
+
 impl Op {
     fn execute_on<H: Harness>(self, chip: &mut State, mut bus: impl DerefMut<Target = H>) -> OpOutcome {
         let cycles = match self {
@@ -109,10 +116,19 @@ impl Op {
             } else {
                 11
             }
+            Compare{from} => {
+                let (value, time) = match chip.resolve_byte(from) {
+                    Byte::Single(register) => (chip[register], 4),
+                    Byte::RAM(address) => (bus.read(address), 7),
+                    _ => unreachable!()
+                };
+                CompareWith { value }.execute_on(chip, bus)?;
+                time
+            }
             CompareWith{value} => {
-                let base = chip[Register::A];
-                let (comparison, borrow) = base.overflowing_sub(value);
-                *chip.update_flags_for(comparison) = borrow;
+                let (value, carry, aux) = subtract(chip[Register::A], value);
+                *chip.update_flags_for(value) = carry;
+                chip.a = aux;
                 7
             }
             DecrementByte { register } => {
@@ -276,13 +292,10 @@ impl Op {
                 time
             }
             SubtractBy{ value, carry } => {
-                let value = (!value.wrapping_add((chip.c && carry) as u8)).wrapping_add(1);
-                let accumulator = &mut chip[Register::A];
-                let aux = *accumulator ^ value;
-                let (value, carry) = accumulator.overflowing_add(value);
-                *accumulator = value;
-                *chip.update_flags() = !carry;
-                chip.a = (value ^ aux) & 0x10 != 0;
+                let (value, carry, aux) = subtract(chip[Register::A], value.wrapping_add((chip.c && carry) as u8));
+                chip[Register::A] = value;
+                *chip.update_flags() = carry;
+                chip.a = aux;
                 7
             }
             NOP(n) => n,

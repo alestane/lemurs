@@ -11,6 +11,7 @@ pub enum Op {
     AndWith{value: u8},
     Call{sub: u16},
     CallIf(Test, u16),
+    Compare{from: Byte},
     CompareWith{ value: u8 },
     DecrementByte{register: Byte},
     ExchangeDoubleWithHilo, 
@@ -192,6 +193,7 @@ mod b11_111_000 {
     const AndWithAccumulator: u8    = 0b10_100_000;
     const ExclusiveOrWithAccumulator: u8    = 0b10_101_000;
     const OrWithAccumulator: u8 = 0b10_110_000;
+    const CompareWithAccumulator: u8    = 0b10_111_000;
 }
 
 #[disclose]
@@ -257,6 +259,7 @@ impl TryFrom<[u8;1]> for Op {
                 (b11_111_000::AndWithAccumulator, value) => return Ok(And{from: Byte::from(value)}),
                 (b11_111_000::ExclusiveOrWithAccumulator, value) => return Ok(ExclusiveOr { from: Byte::from(value) }),
                 (b11_111_000::OrWithAccumulator, value) => return Ok(Or { from: Byte::from(value) }),
+                (b11_111_000::CompareWithAccumulator, value) => return Ok(Compare{from: Byte::from(value)}),
                 _ => value,
             };
             let _value = match value & 0b11_000000 {
@@ -327,7 +330,7 @@ impl Op {
                 => 2,
             NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | 
             Move{..} | RotateRightCarrying | IncrementByte {..} | DecrementByte {..} | Add{..}  | Subtract{..} |
-            And{..} | ExclusiveOr{..} | Or{..}
+            And{..} | ExclusiveOr{..} | Or{..} | Compare{..}
                 => 1,
         }
     }
