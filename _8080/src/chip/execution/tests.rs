@@ -72,6 +72,13 @@ fn and() {
     assert_eq!(chip.register[6], 0b00000000);
     assert_flags!(chip, !a, !c, !m);
     assert_flags!(chip, z, p);
+
+    chip[Register::A] = 0b0110_1110;
+    chip[Register::D] = 0b1011_1001;
+    And{ from: Byte::Single(Register::D) }.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[Register::A], 0b0010_1000);
+    assert_flags!(chip, p);
+    assert_flags!(chip, !c, !m, !z);
 }
 
     #[test]

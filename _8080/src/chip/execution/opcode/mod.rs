@@ -5,8 +5,9 @@ use crate::{convert::TryFrom, chip::access::{Byte, Register, Word, Double, Inter
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Op {
     NOP(u8),
-    AddTo{value: u8, carry: bool},
     Add{from: Byte, carry: bool},
+    AddTo{value: u8, carry: bool},
+    And{from: Byte},
     AndWith{value: u8},
     Call{sub: u16},
     CallIf(Test, u16),
@@ -185,6 +186,7 @@ mod b11_000_111 {
 mod b11_111_000 {
     const AddToAccumulator: u8  = 0b10_000_000;
     const AddCarryingToAccumulator : u8 = 0b10_001_000;
+    const AndWithAccumulator: u8    = 0b10_100_000;
     const ExclusiveOrWithAccumulator: u8    = 0b10_101_000;
     const SubtractFromAccumulator: u8   = 0b10_010_000;
     const SubtractBorrowingFromAccumulator: u8  = 0b10_011_000;
@@ -245,12 +247,13 @@ impl TryFrom<[u8;1]> for Op {
                 b11_00_1111::Pop => return Ok(Pop(match Internal::from(value) { Internal::StackPointer => Word::ProgramStatus, wide => Word::OnBoard(wide)})),
                 _ => value,
             };
-            let _value = match value & 0b11_111_000 {
-                b11_111_000::AddToAccumulator => return Ok(Add{from: Byte::from(value << 3), carry: false}),
-                b11_111_000::AddCarryingToAccumulator => return Ok(Add{ from: Byte::from(value << 3), carry: true}),
-                b11_111_000::ExclusiveOrWithAccumulator => return Ok(ExclusiveOr { from: Byte::from(value << 3) }),
-                b11_111_000::SubtractFromAccumulator => return Ok(Subtract{ from: Byte::from(value << 3), carry: false}),
-                b11_111_000::SubtractBorrowingFromAccumulator => return Ok(Subtract{ from: Byte::from(value << 3), carry: true}),
+            let _value = match (value & 0b11_111_000, value << 3) {
+                (b11_111_000::AddToAccumulator, value) => return Ok(Add{from: Byte::from(value), carry: false}),
+                (b11_111_000::AddCarryingToAccumulator, value) => return Ok(Add{ from: Byte::from(value), carry: true}),
+                (b11_111_000::SubtractFromAccumulator, value) => return Ok(Subtract{ from: Byte::from(value), carry: false}),
+                (b11_111_000::SubtractBorrowingFromAccumulator, value) => return Ok(Subtract{ from: Byte::from(value), carry: true}),
+                (b11_111_000::AndWithAccumulator, value) => return Ok(And{from: Byte::from(value)}),
+                (b11_111_000::ExclusiveOrWithAccumulator, value) => return Ok(ExclusiveOr { from: Byte::from(value) }),
                 _ => value,
             };
             let _value = match value & 0b11_000000 {
@@ -320,7 +323,8 @@ impl Op {
             AddTo{..} | AndWith{..} | ExclusiveOrWith{..} | OrWith{..} | SubtractBy{..} | CompareWith{..} | MoveData{..}
                 => 2,
             NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | 
-            Move{..} | RotateRightCarrying | IncrementByte {..} | DecrementByte {..} | Add{..} | ExclusiveOr{..} |Subtract{..}
+            Move{..} | RotateRightCarrying | IncrementByte {..} | DecrementByte {..} | Add{..}  | Subtract{..} |
+            And{..} | ExclusiveOr{..}
                 => 1,
         }
     }

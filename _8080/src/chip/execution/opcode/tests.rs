@@ -40,6 +40,8 @@ fn dec() {
 fn and() {
     let op = decode(&[0xE6, 0x79]).unwrap();
     assert_eq!(op.0, AndWith{value: 0x79});
+    let op = decode(&[0xA5]).unwrap();
+    assert_eq!(op.0, And{from: Byte::Single(Register::L)});
 }
 
 #[test]
