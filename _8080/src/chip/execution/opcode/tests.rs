@@ -108,6 +108,10 @@ fn transfer() {
     assert_eq!(op.0, StoreAccumulator { address: 0x9A67 });
     let op = decode(&[0x3A, 0x31, 0xE7]).unwrap();
     assert_eq!(op.0, LoadAccumulator { address: 0xE731 });
+    let op = decode(&[0x2A, 0x5B, 0x73]).unwrap();
+    assert_eq!(op.0, LoadHilo{address: 0x735B});
+    let op = decode(&[0x2A]).unwrap_err();
+    assert_eq!(op, Error::Invalid([0x2A]));
 }
 
 #[test]

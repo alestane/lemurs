@@ -211,6 +211,10 @@ impl Op {
                 chip[to] = value;
                 10
             }
+            LoadHilo{address} => {
+                chip[Double::HL] = bus.read_word(address);
+                16
+            }
             Move{to, from} => {
                 let (to, from) = (chip.resolve_byte(to), chip.resolve_byte(from));
                 match (to, from) {

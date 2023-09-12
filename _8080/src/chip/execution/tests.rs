@@ -234,6 +234,11 @@ fn transfer() {
     env[0x6275] = 0x6A;
     LoadAccumulator { address: 0x6275 }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[Register::A], 0x6A);
+    env[0x8362] = 0x56;
+    env[0x8363] = 0xA8;
+    LoadHilo{address: 0x8362}.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[Register::H], 0xA8);
+    assert_eq!(chip[Register::L], 0x56);
 }
 
 #[test]
