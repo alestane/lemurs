@@ -302,6 +302,10 @@ impl Op {
                 bus.write(chip[Register::A], address);
                 13
             }
+            StoreHilo{ address } => {
+                bus.write_word(chip[Double::HL], address);
+                16
+            }
             Subtract { from, carry } => {
                 let (value, time) = match chip.resolve_byte(from) {
                     Byte::Single(register) => (chip[register], 4),

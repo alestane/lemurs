@@ -112,6 +112,8 @@ fn transfer() {
     assert_eq!(op.0, LoadHilo{address: 0x735B});
     let op = decode(&[0x2A]).unwrap_err();
     assert_eq!(op, Error::Invalid([0x2A]));
+    let op = decode(&[0x22, 0x03, 0x01]).unwrap();
+    assert_eq!(op.0, StoreHilo{address: 0x0103});
 }
 
 #[test]

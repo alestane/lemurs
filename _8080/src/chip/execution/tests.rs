@@ -239,6 +239,9 @@ fn transfer() {
     LoadHilo{address: 0x8362}.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[Register::H], 0xA8);
     assert_eq!(chip[Register::L], 0x56);
+    StoreHilo{address: 0x7632}.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(env[0x7632], 0x56);
+    assert_eq!(env[0x7633], 0xA8);
 }
 
 #[test]

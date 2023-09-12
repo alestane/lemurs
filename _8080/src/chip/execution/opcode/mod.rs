@@ -38,6 +38,7 @@ pub enum Op {
     ReturnIf(Test),
     RotateRightCarrying,
     StoreAccumulator{address: u16},
+    StoreHilo{address: u16},
     Subtract{from: Byte, carry: bool},
     SubtractBy{value: u8, carry: bool},
 }
@@ -140,6 +141,7 @@ mod b11111111 {
     const StoreAccumulatorDirect: u8    = 0b00110010;
     const LoadAccumulatorDirect: u8 = 0b00111010;
 
+    const StoreHiloDirect: u8   = 0b00100010;
     const LoadHiloDirect: u8    = 0b00101010;
 
     const DecimalAddAdjust: u8      = 0b00100111;
@@ -318,6 +320,7 @@ impl TryFrom<[u8;3]> for Op {
         let data = u16::from_le_bytes([value[1], value[2]]);
         match action {
             b11111111::LoadHiloDirect => return Ok(LoadHilo{address: data}),
+            b11111111::StoreHiloDirect => return Ok(StoreHilo{address: data}),
             b11111111::LoadAccumulatorDirect => return Ok(LoadAccumulator { address: data }),
             b11111111::StoreAccumulatorDirect => return Ok(StoreAccumulator { address: data }),
             b11111111::Jump => return Ok(Jump{to: data}),
@@ -340,8 +343,8 @@ impl TryFrom<[u8;3]> for Op {
 impl Op {
     pub fn len(&self) -> u8 {
         match self {
-            Call{..} | CallIf(..) | Jump{..} | JumpIf(..) | 
-            LoadExtendedWith{..} | ReturnIf(..) | StoreAccumulator{..} | LoadAccumulator {..} | LoadHilo{..}
+            Call{..} | CallIf(..) | Jump{..} | JumpIf(..) | LoadExtendedWith{..} | 
+            ReturnIf(..) | StoreAccumulator{..} | LoadAccumulator {..} | LoadHilo{..} | StoreHilo {..}
                 => 3,
             AddTo{..} | AndWith{..} | ExclusiveOrWith{..} | OrWith{..} | SubtractBy{..} | CompareWith{..} | MoveData{..}
                 => 2,
