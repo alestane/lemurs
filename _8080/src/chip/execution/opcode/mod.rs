@@ -417,7 +417,7 @@ impl Op {
         match code[0] {
             0xCB | 0xD9 => return Err(Error::Unknown(code[0])),
             0xDD | 0xED | 0xFD => return Err(Error::Unknown(code[0])),
-            nop if nop & 0b00_111_0000 == 0 => return Err(Error::Unknown(nop)),
+            nop if nop & 0b11_000_111 == 0 => return Err(Error::Unknown(nop)),
             _ => ()
         };
         let code = match Op::try_from([code[0], bus.read(start + Wrapping(1)).0]) {
