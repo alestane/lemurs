@@ -1,6 +1,6 @@
 use core::ops::DerefMut;
 use crate::{num::NonZeroU8, String, Machine, Harness};
-use super::{State, access::*};
+use super::{State, access::{*, Double::*}};
 
 pub mod opcode;
 use opcode::{Op, Op::*};
@@ -148,6 +148,10 @@ impl Op {
             DecrementWord{register} => {
                 chip[register] = chip[register].wrapping_sub(1);
                 5
+            }
+            DoubleAdd { register } => {
+                (chip[HL], chip.c) = chip[HL].overflowing_add(chip[register]);
+                10
             }
             ExchangeDoubleWithHilo => {
                 (chip[Double::DE], chip[Double::HL]) = (chip[Double::HL], chip[Double::DE]);

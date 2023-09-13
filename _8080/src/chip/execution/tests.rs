@@ -1,5 +1,5 @@
 use super::*;
-use access::{Double::*, Register::*};
+use access::{Double::*, Register::*, Internal::*};
 use crate::{chip::*, SimpleBoard};
 use opcode::{Test::*, Flag::*};
 
@@ -40,9 +40,9 @@ fn add() {
     assert_flags!(chip, a, m);
     assert_flags!(chip, !c, !z, !p);
 
-    chip[Register::L] = 0x5A;
-    Add{from:Byte::Single(Register::L), carry: false}.execute_on(&mut chip, &mut env).unwrap();
-    assert_eq!(chip[Register::A], 0xDA);
+    chip[L] = 0x5A;
+    Add{from:Byte::Single(L), carry: false}.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[A], 0xDA);
     assert_flags!(chip, !a, !c, !z, !p);
     assert_flags!(chip, m);
 
@@ -56,6 +56,12 @@ fn add() {
     assert_eq!(chip[A], 0b0101_0001);
     assert_flags!(chip, a, c);
     assert_flags!(chip, !z, !p, !m);
+
+    chip[D] = 0x45;
+    chip[H] = 0xE4;
+    DoubleAdd{register: Wide(DE)}.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[HL], 0x2976);
+    assert_flags!(chip, c);
 }
 
 #[test]

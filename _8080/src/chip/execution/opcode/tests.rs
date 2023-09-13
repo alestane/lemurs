@@ -118,6 +118,8 @@ fn transfer() {
     assert_eq!(op.0, LoadAccumulatorIndirect { register: Double::DE });
     let op = decode(&[0x02]).unwrap();
     assert_eq!(op.0, StoreAccumulatorIndirect { register: Double::BC });
+    let op = decode(&[0x39]).unwrap();
+    assert_eq!(op.0, DoubleAdd { register: Internal::StackPointer });
 }
 
 #[test]
