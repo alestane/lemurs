@@ -25,6 +25,7 @@ pub enum Op {
     Jump{to: u16},
     JumpIf(Test, u16),
     LoadAccumulator{address: u16},
+    LoadAccumulatorIndirect{register: Double},
     LoadExtendedWith{to: Internal, value: u16 },
     LoadHilo{address: u16},
     Move{to: Byte, from: Byte},
@@ -38,6 +39,7 @@ pub enum Op {
     ReturnIf(Test),
     RotateRightCarrying,
     StoreAccumulator{address: u16},
+    StoreAccumulatorIndirect{register: Double},
     StoreHilo{address: u16},
     Subtract{from: Byte, carry: bool},
     SubtractBy{value: u8, carry: bool},
@@ -216,6 +218,13 @@ mod b11_000000 {
     const Move: u8  = 0b01_000000;
 }
 
+#[disclose]
+#[allow(non_upper_case_globals)]
+mod b111_0_1111 {
+    const LoadAccumulatorIndirect: u8   = 0b000_0_1010;
+    const StoreAccumulatorIndirect: u8  = 0b000_0_0010;
+}
+
 pub struct OutOfRange;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Error {
@@ -285,6 +294,15 @@ impl TryFrom<[u8;1]> for Op {
                 }
                 _ => value,
             };
+            let _value = match value & 0b111_0_1111 {
+                b111_0_1111::LoadAccumulatorIndirect => return Ok(LoadAccumulatorIndirect { 
+                    register: if value & 0b000_1_0000 != 0 { Double::DE } else { Double::BC }
+                }),
+                b111_0_1111::StoreAccumulatorIndirect => return Ok(StoreAccumulatorIndirect { 
+                    register: if value & 0b000_1_0000 != 0 { Double::DE } else { Double::BC }
+                }),
+                _ => value,
+            };
         }
         Err(value)
     }
@@ -350,7 +368,8 @@ impl Op {
                 => 2,
             NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | 
             Move{..} | RotateRightCarrying | IncrementByte {..} | DecrementByte {..} | Add{..}  | Subtract{..} |
-            And{..} | ExclusiveOr{..} | Or{..} | Compare{..} | IncrementWord{..} | DecrementWord {..}
+            And{..} | ExclusiveOr{..} | Or{..} | Compare{..} | IncrementWord{..} | DecrementWord {..} |
+            LoadAccumulatorIndirect {..} | StoreAccumulatorIndirect{..}
                 => 1,
         }
     }

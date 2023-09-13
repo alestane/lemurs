@@ -242,6 +242,12 @@ fn transfer() {
     StoreHilo{address: 0x7632}.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(env[0x7632], 0x56);
     assert_eq!(env[0x7633], 0xA8);
+    chip[Double::BC] = 0x7633;
+    LoadAccumulatorIndirect { register: Double::BC }.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[Register::A], 0xA8);
+    chip[Double::DE] = 0x8349;
+    StoreAccumulatorIndirect { register: Double::DE }.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(env[0x8349], 0xA8);
 }
 
 #[test]

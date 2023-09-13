@@ -207,6 +207,10 @@ impl Op {
                 chip[Register::A] = bus.read(address);
                 13
             }
+            LoadAccumulatorIndirect { register } => {
+                chip[Register::A] = bus.read(chip[register]);
+                7
+            }
             LoadExtendedWith { to, value } => {
                 chip[to] = value;
                 10
@@ -301,6 +305,10 @@ impl Op {
             StoreAccumulator { address } => {
                 bus.write(chip[Register::A], address);
                 13
+            }
+            StoreAccumulatorIndirect { register } => {
+                bus.write(chip[Register::A], chip[register]);
+                7
             }
             StoreHilo{ address } => {
                 bus.write_word(chip[Double::HL], address);
