@@ -18,7 +18,7 @@ impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
 		if !self.chip.active { return Ok(NonZeroU8::new(1)) };
         let (op, len) = Op::extract(self.board.deref_mut(), self.chip.pc)
             .map_err(|e| panic!("Couldn't extract opcode from {e:X} at {:#06X}", self.pc)).unwrap();
-        self.chip.pc += Wrapping(len as raw::u16); 
+        self.chip.pc += len as raw::u16; 
         let outcome = op.execute_on(&mut self.chip, self.board.deref_mut());
         match outcome {
             Ok(Some(_)) => (),
@@ -36,7 +36,7 @@ impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
 		if !self.active { return NonZeroU8::new(1) };
         let (op, len) = Op::extract(self.board.deref(), self.pc)
             .map_err(|e| panic!("Couldn't extract opcode from {e:X?}")).unwrap();
-        self.pc += Wrapping(len as raw::u16); 
+        self.pc += len as raw::u16; 
         let elapsed = op.execute_on(&mut self.chip, self.board.deref_mut());
         if elapsed.is_none() { self. active = false; }
         elapsed
