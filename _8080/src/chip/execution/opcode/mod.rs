@@ -43,6 +43,8 @@ pub enum Op {
     ReturnIf(Test),
     RotateLeftCarrying,
     RotateRightCarrying,
+    RotateAccumulatorLeft,
+    RotateAccumulatorRight,
     StoreAccumulator{address: bits::u16},
     StoreAccumulatorIndirect{register: Double},
     StoreHilo{address: bits::u16},
@@ -267,6 +269,8 @@ impl TryFrom<[u8;1]> for Op {
                 b11111111::ExchangeTopWithHilo => return Ok(ExchangeTopWithHilo),
                 b11111111::RotateLeftCarrying => return Ok(RotateLeftCarrying),
                 b11111111::RotateRightCarrying => return Ok(RotateRightCarrying),
+                b11111111::RotateAccumulatorLeft => return Ok(RotateAccumulatorLeft),
+                b11111111::RotateAccumulatorRight => return Ok(RotateAccumulatorRight),
                 b11111111::SetCarry => return Ok(CarryFlag(true)),
                 b11111111::ComplementCarry => return Ok(CarryFlag(false)),
                 b11111111::DecimalAddAdjust => return  Ok(DecimalAddAdjust),
@@ -380,9 +384,9 @@ impl Op {
             AddTo{..} | AndWith{..} | ExclusiveOrWith{..} | OrWith{..} | SubtractBy{..} | CompareWith{..} | MoveData{..}
                 => 2,
             NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | 
-            Move{..} | RotateLeftCarrying | RotateRightCarrying | IncrementByte {..} | DecrementByte {..} | 
-            Add{..}  | Subtract{..} | And{..} | ExclusiveOr{..} | Or{..} | Compare{..} | 
-            IncrementWord{..} | DecrementWord {..} | LoadAccumulatorIndirect {..} | StoreAccumulatorIndirect{..} | 
+            Move{..} | RotateLeftCarrying | RotateRightCarrying | RotateAccumulatorLeft | RotateAccumulatorRight | 
+            IncrementByte {..} | DecrementByte {..} | Add{..}  | Subtract{..} | And{..} | ExclusiveOr{..} | Or{..} | 
+            Compare{..} | IncrementWord{..} | DecrementWord {..} | LoadAccumulatorIndirect {..} | StoreAccumulatorIndirect{..} | 
             DoubleAdd{..} | CarryFlag(..) | DecimalAddAdjust | ComplementAccumulator
                 => 1,
         }

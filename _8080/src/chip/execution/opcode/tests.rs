@@ -191,6 +191,10 @@ fn rotate() {
     assert_eq!(op.0, RotateRightCarrying);
     let op = decode(&[0x07]).unwrap();
     assert_eq!(op.0, RotateLeftCarrying);
+    let op = decode(&[0x17]).unwrap();
+    assert_eq!(op.0, RotateAccumulatorLeft);
+    let op = decode(&[0x1F, 0x84]).unwrap();
+    assert_eq!(op.0, RotateAccumulatorRight)
 }
 
 #[test]

@@ -319,6 +319,20 @@ impl Op {
                     5
                 }
             }
+            RotateAccumulatorLeft => {
+                let bits = chip[A].0 as raw::u16 | if chip.c { 0x8000 } else { 0x0000 };
+                let [bits, carry] = bits.rotate_left(1).to_le_bytes();
+                chip.c = carry != 0;
+                chip[A] = Wrapping(bits);
+                4
+            }
+            RotateAccumulatorRight => {
+                let bits = chip[A].0 as raw::u16 | if chip.c { 0x0100 } else { 0x0000 };
+                let [bits, carry] = bits.rotate_right(1).to_le_bytes();
+                chip.c = carry != 0;
+                chip[A] = Wrapping(bits);
+                4
+            }
             RotateLeftCarrying => {
                 let accumulator = chip[A].0;
                 chip.c = accumulator & 0x80 != 0;
