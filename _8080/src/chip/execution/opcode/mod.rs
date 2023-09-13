@@ -18,12 +18,14 @@ pub enum Op {
     DecimalAddAdjust,
     DecrementByte{register: Byte},
     DecrementWord{register: Internal},
+    Interrupts(bool),
     DoubleAdd{register: Internal},
     ExchangeDoubleWithHilo, 
     ExchangeTopWithHilo,
     ExclusiveOr{ from: Byte },
     ExclusiveOrWith{value: bits::u8},
     Halt,
+    In(u8),
     IncrementByte{register: Byte},
     IncrementWord{register: Internal},
     Jump{to: bits::u16},
@@ -36,6 +38,7 @@ pub enum Op {
     MoveData{value: bits::u8, to: Byte},
     Or{from: Byte},
     OrWith{value: bits::u8},
+    Out(u8),
     Pop(Word),
     ProgramCounterFromHilo,
     Push(Word),
@@ -172,6 +175,9 @@ mod b11111111 {
     const ExchangeDoubleWithHilo: u8    = 0b11101011;
     const StackPointerFromHilo: u8      = 0b11111001;
 
+    const DisableInterrupts: u8 = 0b11110011;
+    const EnableInterrupts: u8  = 0b11111011;
+
     const AndImmediate: u8  = 0b11100110;
     const AddImmediate: u8  = 0b11000110;
     const AddImmediateCarrying: u8  = 0b11001110;
@@ -238,6 +244,7 @@ mod b111_0_1111 {
 pub struct OutOfRange;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Error {
+    Unknown(u8),
     NotUsable(Op),
     Mismatch(Op, u8),
     Invalid([u8;1]),
@@ -279,6 +286,8 @@ impl TryFrom<[u8;1]> for Op {
                 b11111111::ComplementAccumulator => return Ok(ComplementAccumulator),
                 b11111111::ProgramCounterFromHilo => return Ok(ProgramCounterFromHilo),
                 b11111111::StackPointerFromHilo => return Ok(StackPointerFromHilo),
+                b11111111::DisableInterrupts => return Ok(Interrupts(false)),
+                b11111111::EnableInterrupts => return Ok(Interrupts(true)),
                 _ => value
             };
             let _value = match value & 0b11_000_111 {
@@ -342,6 +351,8 @@ impl TryFrom<[u8;2]> for Op {
             b11111111::ExclusiveOr => return Ok(ExclusiveOrWith{value}),
             b11111111::OrImmediate => return Ok(OrWith{value}),
             b11111111::CompareImmediate => return Ok(CompareWith{ value }),
+            b11111111::Output => return Ok(Out(code[1])),
+            b11111111::Input => return Ok(In(code[1])),
             _next => action,
         };
         let _action = match action & 0b11_000_111 {
@@ -385,12 +396,14 @@ impl Op {
             Call{..} | CallIf(..) | Jump{..} | JumpIf(..) | LoadExtendedWith{..} | 
             ReturnIf(..) | StoreAccumulator{..} | LoadAccumulator {..} | LoadHilo{..} | StoreHilo {..}
                 => 3,
-            AddTo{..} | AndWith{..} | ExclusiveOrWith{..} | OrWith{..} | SubtractBy{..} | CompareWith{..} | MoveData{..}
+            AddTo{..} | AndWith{..} | ExclusiveOrWith{..} | OrWith{..} | SubtractBy{..} | CompareWith{..} | MoveData{..} |
+            Out(..) | In(..)
                 => 2,
             NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | 
             Move{..} | RotateLeftCarrying | RotateRightCarrying | RotateAccumulatorLeft | RotateAccumulatorRight | 
             IncrementByte {..} | DecrementByte {..} | Add{..}  | Subtract{..} | And{..} | ExclusiveOr{..} | Or{..} | 
-            Compare{..} | IncrementWord{..} | DecrementWord {..} | LoadAccumulatorIndirect {..} | StoreAccumulatorIndirect{..} | 
+            Compare{..} | IncrementWord{..} | DecrementWord {..} | Interrupts(..) | 
+            LoadAccumulatorIndirect {..} | StoreAccumulatorIndirect{..} | 
             DoubleAdd{..} | CarryFlag(..) | DecimalAddAdjust | ComplementAccumulator | ProgramCounterFromHilo | StackPointerFromHilo
                 => 1,
         }
@@ -400,6 +413,12 @@ impl Op {
         let code = match Op::try_from([bus.read(start).0]) {
             Ok(op) => return Ok((op, 1)),
             Err(code) => code,
+        };
+        match code[0] {
+            0xCB | 0xD9 => return Err(Error::Unknown(code[0])),
+            0xDD | 0xED | 0xFD => return Err(Error::Unknown(code[0])),
+            nop if nop & 0b00_111_0000 == 0 => return Err(Error::Unknown(nop)),
+            _ => ()
         };
         let code = match Op::try_from([code[0], bus.read(start + Wrapping(1)).0]) {
             Ok(op) => return Ok((op, 2)),

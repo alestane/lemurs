@@ -65,8 +65,8 @@ pub trait Harness {
             self.write(num::Wrapping(byte), to + num::Wrapping(index as u16))
         }
     }
-	fn input(&mut self, port: bits::u8) -> bits::u8;
-	fn output(&mut self, port: bits::u8, value: bits::u8);
+	fn input(&mut self, port: u8) -> bits::u8;
+	fn output(&mut self, port: u8, value: bits::u8);
     #[cfg(debug_assertions)]
     fn did_execute(&mut self, client: &State, did: op::Op) -> Result<Option<op::Op>, String> { let _ = (client, did); Ok( None ) }
 }
@@ -101,11 +101,11 @@ impl Harness for SimpleBoard {
     fn write_word(&mut self, value: bits::u16, to: bits::u16) {
         [self.ram[to.0 as usize], self.ram[to.0.wrapping_add(1) as usize]] = value.0.to_le_bytes();
     }
-	fn input(&mut self, port: bits::u8) -> bits::u8 {
-		Wrapping(self.port_in[port.0 as usize])
+	fn input(&mut self, port: u8) -> bits::u8 {
+		Wrapping(self.port_in[port as usize])
 	}
-	fn output(&mut self, port: bits::u8, value: bits::u8) {
-		self.port_out[port.0 as usize] = value.0
+	fn output(&mut self, port: u8, value: bits::u8) {
+		self.port_out[port as usize] = value.0
 	}
 }
 

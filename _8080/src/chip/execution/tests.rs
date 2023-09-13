@@ -454,6 +454,18 @@ fn move_i() {
 }
 
 #[test]
+fn io() {
+    let mut env = SimpleBoard::default();
+    let mut chip = State::new();
+    chip[A] = Wrapping(0x56);
+    Out(0x74).execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(env.port_out[0x74], 0x56);
+    env.port_in[0x7A] = 0xA1;
+    In(0x7A).execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[A].0, 0xA1);
+}
+
+#[test]
 fn internals() {
     let mut env = Socket::default();
     let mut chip = State::new();
@@ -461,4 +473,6 @@ fn internals() {
     assert!(chip.c);
     CarryFlag(false).execute_on(&mut chip, &mut env).unwrap();
     assert!(!chip.c);
+    Interrupts(false).execute_on(&mut chip, &mut env).unwrap();
+    assert!(!chip.interrupts);
 }

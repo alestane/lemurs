@@ -6,7 +6,13 @@ fn decode(value: &[u8]) -> crate::Result<(Op, usize), self::Error> {
         Ok(op) => return Ok( (op, 1) ),
         Err(code) => code,
     };
-    if value.len() < 2 { return Err(self::Error::Invalid(code)); }
+    match code[0] {
+        0xCB | 0xD9 => return Err(Error::Unknown(code[0])),
+        0xDD | 0xED | 0xFD => return Err(Error::Unknown(code[0])),
+        nop if nop & 0b11_000_111 == 0 => return Err(Error::Unknown(nop)),
+        _ => ()
+    };
+if value.len() < 2 { return Err(self::Error::Invalid(code)); }
     let code = match Op::try_from([code[0], value[1]]) {
         Ok(op) => return Ok( (op, 2) ),
         Err(code) => code,
@@ -239,11 +245,25 @@ fn internals() {
     assert_eq!(op.0, CarryFlag(true));
     let op = decode(&[0x3F, 0x00]).unwrap();
     assert_eq!(op.0, CarryFlag(false));
+    let op = decode(&[0xF3]).unwrap();
+    assert_eq!(op.0, Interrupts(false));
+    let op = decode(&[0xFB]).unwrap();
+    assert_eq!(op.0, Interrupts(true));
+}
+
+fn io() {
+    let op = decode(&[0xD3, 0x85]).unwrap();
+    assert_eq!(op.0, Out(0x85));
+    let op = decode(&[0xDB, 0x45]).unwrap();
+    assert_eq!(op.0, In(0x45));
 }
 
 #[test]
 fn all() {
     for op in 0u8.. {
-        decode(&[op, 0x45, 0x3B]).unwrap();
+        match decode(&[op, 0x45, 0x3B]) {
+            Ok(..) | Err(Error::Unknown(..)) => (),
+            Err(err) => panic!("{err:X}"),
+        };
     }
 }

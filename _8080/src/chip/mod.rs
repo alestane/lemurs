@@ -4,7 +4,7 @@ pub use execution::opcode;
 
 use core::cell::UnsafeCell;
 
-use crate::{Harness, ops::{Deref, DerefMut, Index, IndexMut}, Machine, bits::*, num::Wrapping};
+use crate::{Harness, ops::{Deref, DerefMut, Index, IndexMut}, Machine, raw, bits::*, num::Wrapping};
 
 #[cfg(not(debug_assertions))]
 pub(self) mod access;
@@ -45,8 +45,8 @@ impl Deref for Socket {
 impl Harness for Socket {
 	fn read(&self, from: u16) -> u8 { let _ = from; Wrapping(0) }
 	fn read_word(&self, from: u16) -> u16 { let _ = from; Wrapping(0) }
-	fn input(&mut self, _port: u8) -> u8 { Wrapping(0) }
-	fn output(&mut self, _port: u8, _value: u8) { }
+	fn input(&mut self, _port: raw::u8) -> u8 { Wrapping(0) }
+	fn output(&mut self, _port: raw::u8, _value: u8) { }
 }
 
 #[cfg_attr(debug_assertions, disclose)]

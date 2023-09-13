@@ -205,6 +205,10 @@ impl Op {
                 chip.active = false;
                 7
             }
+            In(port) => {
+                chip[A] = bus.input(port);
+                10
+            }
             IncrementByte { register } => {
                 let (value, time) = match chip.resolve_byte(register) {
                     Single(reg) => { chip[reg] += 1; (chip[reg], 5)}
@@ -222,6 +226,10 @@ impl Op {
             IncrementWord { register } => {
                 chip[register] += 1;
                 5
+            }
+            Interrupts(active) => {
+                chip.interrupts = active;
+                4
             }
             Jump{to} => {
                 chip.pc = to;
@@ -281,6 +289,10 @@ impl Op {
                 chip[A] |= value;
                 *chip.update_flags() = false;
                 7
+            }
+            Out(port) => {
+                bus.output(port, chip[A]);
+                10
             }
             Pop(target) => {
                 match target {
