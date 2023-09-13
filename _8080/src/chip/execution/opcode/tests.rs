@@ -27,9 +27,9 @@ fn no_op() {
 #[test]
 fn inc() {
     let op = decode(&[0x1C]).unwrap();
-    assert_eq!(op.0, IncrementByte { register: Byte::Single(Register::E) });
+    assert_eq!(op.0, IncrementByte { register: Single(E) });
     let op = decode(&[0x23]).unwrap();
-    assert_eq!(op.0, IncrementWord { register: Internal::Wide(Double::HL) });
+    assert_eq!(op.0, IncrementWord { register: Wide(HL) });
 }
 
 #[test]
@@ -37,7 +37,7 @@ fn dec() {
     let op = decode(&[0x35, 0x78]).unwrap();
     assert_eq!(op.0, DecrementByte{ register: Byte::Indirect });
     let op = decode(&[0x1B]).unwrap();
-    assert_eq!(op.0, DecrementWord{register: Internal::Wide(Double::DE)});
+    assert_eq!(op.0, DecrementWord{register: Wide(DE)});
 }
 
 #[test]
@@ -45,7 +45,7 @@ fn and() {
     let op = decode(&[0xE6, 0x79]).unwrap();
     assert_eq!(op.0, AndWith{value: 0x79});
     let op = decode(&[0xA5]).unwrap();
-    assert_eq!(op.0, And{from: Byte::Single(Register::L)});
+    assert_eq!(op.0, And{from: Single(L)});
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn xor() {
     let op = decode(&[0xEE, 0x4D]).unwrap();
     assert_eq!(op.0, ExclusiveOrWith { value: 0x4D });
     let op = decode(&[0xA9]).unwrap();
-    assert_eq!(op.0, ExclusiveOr { from: Byte::Single(Register::C) });
+    assert_eq!(op.0, ExclusiveOr { from: Byte::Single(C) });
 }
 
 #[test]
@@ -61,7 +61,7 @@ fn or() {
     let op = decode(&[0xF6, 0x23]).unwrap();
     assert_eq!(op.0, OrWith{value: 0x23});
     let op = decode(&[0xB2]).unwrap();
-    assert_eq!(op.0, Or{from: Byte::Single(Register::D)});
+    assert_eq!(op.0, Or{from: Single(D)});
 }
 
 #[test]
@@ -73,7 +73,7 @@ fn xthl() {
 #[test]
 fn move_() {
     let op = decode(&[0x56]).unwrap();
-    assert_eq!(op.0, Move{to: Byte::Single(Register::D), from: Byte::Indirect});
+    assert_eq!(op.0, Move{to: Single(D), from: Byte::Indirect});
     let op = decode(&[76]).unwrap();
     assert_ne!(op.0, Move{to: Byte::Indirect, from: Byte::Indirect});
 }
@@ -101,7 +101,7 @@ fn return_if() {
 #[test]
 fn transfer() {
     let op = decode(&[0x31, 0x25, 0x02]).unwrap();
-    assert_eq!(op.0, LoadExtendedWith { to: Internal::StackPointer, value: 549 });
+    assert_eq!(op.0, LoadExtendedWith { to: StackPointer, value: 549 });
     let fail = decode(&[0x11, 0x21]).unwrap_err();
     assert_eq!(fail, Error::InvalidPair([0x11, 0x21]));
     let op = decode(&[0x32, 0x67, 0x9A]).unwrap();
@@ -115,11 +115,11 @@ fn transfer() {
     let op = decode(&[0x22, 0x03, 0x01]).unwrap();
     assert_eq!(op.0, StoreHilo{address: 0x0103});
     let op = decode(&[0x1A]).unwrap();
-    assert_eq!(op.0, LoadAccumulatorIndirect { register: Double::DE });
+    assert_eq!(op.0, LoadAccumulatorIndirect { register: DE });
     let op = decode(&[0x02]).unwrap();
-    assert_eq!(op.0, StoreAccumulatorIndirect { register: Double::BC });
+    assert_eq!(op.0, StoreAccumulatorIndirect { register: BC });
     let op = decode(&[0x39]).unwrap();
-    assert_eq!(op.0, DoubleAdd { register: Internal::StackPointer });
+    assert_eq!(op.0, DoubleAdd { register: StackPointer });
 }
 
 #[test]
@@ -157,24 +157,24 @@ fn add() {
     let op = decode(&[0xCE, 0x72]).unwrap();
     assert_eq!(op.0, AddTo{value: 0x72, carry: true});
     let op = decode(&[0x84, 0x87]).unwrap();
-    assert_eq!(op.0, Add{from: Byte::Single(Register::H), carry: false});
+    assert_eq!(op.0, Add{from: Single(H), carry: false});
     let op = decode(&[0x89]).unwrap();
-    assert_eq!(op.0, Add{from: Byte::Single(Register::C), carry: true });
+    assert_eq!(op.0, Add{from: Single(C), carry: true });
 }
 
 #[test]
 fn pop() {
     let op = decode(&[0xE1]).unwrap();
-    assert_eq!(op.0, Pop(Word::OnBoard(Internal::Wide(Double::HL))));
+    assert_eq!(op.0, Pop(OnBoard(Wide(HL))));
 }
 
 #[test]
 fn push() {
     let op = decode(&[0xD5, 0xEB, 0x0E]).unwrap();
     assert_eq!(op.1, 1);
-    assert_eq!(op.0, Push(Word::OnBoard(Internal::Wide(Double::DE))));
+    assert_eq!(op.0, Push(OnBoard(Wide(DE))));
     let op = decode(&[0xF5, 0xB0]).unwrap();
-    assert_eq!(op.0, Push(Word::ProgramStatus));
+    assert_eq!(op.0, Push(ProgramStatus));
 }
 
 #[test]
@@ -187,7 +187,7 @@ fn rotate() {
 fn move_i() {
     let op = decode(&[0x0E, 0x09, 0xCD]).unwrap();
     assert_eq!(op.1, 2);
-    assert_eq!(op.0, MoveData { value: 0x09, to: Byte::Single(Register::C) });
+    assert_eq!(op.0, MoveData { value: 0x09, to: Single(C) });
     let fail = decode(&[0x26]).unwrap_err();
     assert_eq!(fail, Error::Invalid([0x26]));
 }
@@ -199,7 +199,7 @@ fn subtract() {
     let op = decode(&[0xDE, 0x9E]).unwrap();
     assert_eq!(op.0, SubtractBy{value: 0x9E, carry: true});
     let op = decode(&[0x95]).unwrap();
-    assert_eq!(op.0, Subtract{from: Byte::Single(Register::L), carry: false});
+    assert_eq!(op.0, Subtract{from: Single(L), carry: false});
     let op = decode(&[0x9E]).unwrap();
     assert_eq!(op.0, Subtract{from: Byte::Indirect, carry: true});
 }
@@ -212,5 +212,5 @@ fn compare() {
     let fail = decode(&[0xFE]).unwrap_err();
     assert_eq!(fail, Error::Invalid([0xFE]));
     let op = decode(&[0xBF]).unwrap();
-    assert_eq!(op.0, Compare{from: Byte::Single(Register::A)});
+    assert_eq!(op.0, Compare{from: Single(A)});
 }

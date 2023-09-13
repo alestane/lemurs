@@ -1,6 +1,6 @@
 use core::ops::DerefMut;
 use crate::{num::NonZeroU8, String, Machine, Harness};
-use super::{State, access::{*, Double::*}};
+use super::{State, access::{*, Register::*, Byte::*, Double::*, Internal::*, Word::*}};
 
 pub mod opcode;
 use opcode::{Op, Op::*};
@@ -74,7 +74,7 @@ impl Op {
         let cycles = match self {
             Add { from, carry } => {
                 let (value, time) = match chip.resolve_byte(from) {
-                    Byte::Single(register) => (chip[register], 4),
+                    Single(register) => (chip[register], 4),
                     Byte::RAM(address) => ( bus.read(address), 7),
                     _ => unreachable!(),
                 };
@@ -83,7 +83,7 @@ impl Op {
             }
             AddTo { value, carry } => {
                 let carry_in = chip.c && carry;
-                let accumulator = &mut chip[Register::A];
+                let accumulator = &mut chip[A];
                 let aux = *accumulator ^ value;
                 let (value, carry) = accumulator.overflowing_add(value.wrapping_add(carry_in as u8));
                 *accumulator = value;
@@ -93,7 +93,7 @@ impl Op {
             }
             And{from} => {
                 let (value, time) = match chip.resolve_byte(from) {
-                    Byte::Single(register) => (chip[register], 4),
+                    Single(register) => (chip[register], 4),
                     Byte::RAM(address) => (bus.read(address), 7),
                     _ => unreachable!()
                 };
@@ -101,7 +101,7 @@ impl Op {
                 time
             }
             AndWith { value } => {
-                chip[Register::A] &= value;
+                chip[A] &= value;
                 *chip.update_flags() = false;
                 7
             }
@@ -118,7 +118,7 @@ impl Op {
             }
             Compare{from} => {
                 let (value, time) = match chip.resolve_byte(from) {
-                    Byte::Single(register) => (chip[register], 4),
+                    Single(register) => (chip[register], 4),
                     Byte::RAM(address) => (bus.read(address), 7),
                     _ => unreachable!()
                 };
@@ -126,14 +126,14 @@ impl Op {
                 time
             }
             CompareWith{value} => {
-                let (value, carry, aux) = subtract(chip[Register::A], value);
+                let (value, carry, aux) = subtract(chip[A], value);
                 *chip.update_flags_for(value) = carry;
                 chip.a = aux;
                 7
             }
             DecrementByte { register } => {
                 let (value, time) = match chip.resolve_byte(register) {
-                    Byte::Single(reg) => { chip[reg] = chip[reg].wrapping_sub(1); (chip[reg], 5)}
+                    Single(reg) => { chip[reg] = chip[reg].wrapping_sub(1); (chip[reg], 5)}
                     Byte::RAM(address) => { 
                         let value = bus.read(address).wrapping_sub(1); 
                         bus.write(value, address);
@@ -154,18 +154,18 @@ impl Op {
                 10
             }
             ExchangeDoubleWithHilo => {
-                (chip[Double::DE], chip[Double::HL]) = (chip[Double::HL], chip[Double::DE]);
+                (chip[DE], chip[HL]) = (chip[HL], chip[DE]);
                 5
             }
             ExchangeTopWithHilo => {
-                let out = chip[Double::HL];
-                chip[Double::HL] = bus.read_word(chip.sp);
+                let out = chip[HL];
+                chip[HL] = bus.read_word(chip.sp);
                 bus.write_word(out, chip.sp);
                 18
             }
             ExclusiveOr { from } => {
                 let (value, time) = match chip.resolve_byte(from) {
-                    Byte::Single(register) => (chip[register], 4),
+                    Single(register) => (chip[register], 4),
                     Byte::RAM(addr) => (bus.read(addr), 7),
                     _ => unreachable!(),
                 };
@@ -173,7 +173,7 @@ impl Op {
                 time
             }
             ExclusiveOrWith { value } => {
-                chip[Register::A] ^= value;
+                chip[A] ^= value;
                 *chip.update_flags() = false;
                 7
             }
@@ -183,7 +183,7 @@ impl Op {
             }
             IncrementByte { register } => {
                 let (value, time) = match chip.resolve_byte(register) {
-                    Byte::Single(reg) => { chip[reg] = chip[reg].wrapping_add(1); (chip[reg], 5)}
+                    Single(reg) => { chip[reg] = chip[reg].wrapping_add(1); (chip[reg], 5)}
                     Byte::RAM(address) => { 
                         let value = bus.read(address).wrapping_add(1); 
                         bus.write(value, address);
@@ -208,11 +208,11 @@ impl Op {
                 10
             }
             LoadAccumulator{address} => {
-                chip[Register::A] = bus.read(address);
+                chip[A] = bus.read(address);
                 13
             }
             LoadAccumulatorIndirect { register } => {
-                chip[Register::A] = bus.read(chip[register]);
+                chip[A] = bus.read(chip[register]);
                 7
             }
             LoadExtendedWith { to, value } => {
@@ -220,21 +220,21 @@ impl Op {
                 10
             }
             LoadHilo{address} => {
-                chip[Double::HL] = bus.read_word(address);
+                chip[HL] = bus.read_word(address);
                 16
             }
             Move{to, from} => {
                 let (to, from) = (chip.resolve_byte(to), chip.resolve_byte(from));
                 match (to, from) {
-                    (Byte::Single(to), Byte::Single(from)) => {
+                    (Single(to), Single(from)) => {
                         chip[to] = chip[from];
                         5
                     }
-                    (Byte::RAM(address), Byte::Single(from)) => {
+                    (Byte::RAM(address), Single(from)) => {
                         bus.write(chip[from], address);
                         7
                     }
-                    (Byte::Single(to), Byte::RAM(address)) => {
+                    (Single(to), Byte::RAM(address)) => {
                         chip[to] = bus.read(address);
                         7
                     }
@@ -243,14 +243,14 @@ impl Op {
             }
             MoveData { value, to } => {
                 match chip.resolve_byte(to) {
-                    Byte::Single(register) => { chip[register] = value; 7 },
+                    Single(register) => { chip[register] = value; 7 },
                     Byte::RAM(address) => { bus.write(value, address); 10},
-                    Byte::Indirect => unreachable!()
+                    _ => unreachable!()
                 }
             }
             Or{from} => {
                 let (value, time) = match chip.resolve_byte(from) {
-                    Byte::Single(register) => (chip[register], 4),
+                    Single(register) => (chip[register], 4),
                     Byte::RAM(address) => (bus.read(address), 7),
                     _ => unreachable!()
                 };
@@ -258,16 +258,16 @@ impl Op {
                 time
             }
             OrWith{value} => {
-                chip[Register::A] |= value;
+                chip[A] |= value;
                 *chip.update_flags() = false;
                 7
             }
             Pop(target) => {
                 match target {
-                    Word::OnBoard(internal) => chip[internal] = bus.read_word(chip.pop()),
-                    Word::ProgramStatus => {
+                    OnBoard(internal) => chip[internal] = bus.read_word(chip.pop()),
+                    ProgramStatus => {
                         let [accumulator, status] = bus.read_word(chip.pop()).to_le_bytes();
-                        chip[Register::A] = accumulator;
+                        chip[A] = accumulator;
                         chip.extract_flags(status);
                     }
                     _ => unreachable!()
@@ -276,8 +276,8 @@ impl Op {
             }
             Push (source) => {
                 let source = match source {
-                    Word::OnBoard(internal) => chip[internal],
-                    Word::ProgramStatus => chip.status(),
+                    OnBoard(internal) => chip[internal],
+                    ProgramStatus => chip.status(),
                     _ => unreachable!()
                 };
                 bus.write_word(source, chip.push());
@@ -301,26 +301,26 @@ impl Op {
                 }
             }
             RotateRightCarrying => {
-                let accumulator = chip[Register::A];
+                let accumulator = chip[A];
                 chip.c = accumulator & 0x01 != 0;
-                chip[Register::A] = accumulator.rotate_right(1);
+                chip[A] = accumulator.rotate_right(1);
                 4
             }
             StoreAccumulator { address } => {
-                bus.write(chip[Register::A], address);
+                bus.write(chip[A], address);
                 13
             }
             StoreAccumulatorIndirect { register } => {
-                bus.write(chip[Register::A], chip[register]);
+                bus.write(chip[A], chip[register]);
                 7
             }
             StoreHilo{ address } => {
-                bus.write_word(chip[Double::HL], address);
+                bus.write_word(chip[HL], address);
                 16
             }
             Subtract { from, carry } => {
                 let (value, time) = match chip.resolve_byte(from) {
-                    Byte::Single(register) => (chip[register], 4),
+                    Single(register) => (chip[register], 4),
                     Byte::RAM(address) => ( bus.read(address), 7),
                     _ => unreachable!(),
                 };
@@ -328,8 +328,8 @@ impl Op {
                 time
             }
             SubtractBy{ value, carry } => {
-                let (value, carry, aux) = subtract(chip[Register::A], value.wrapping_add((chip.c && carry) as u8));
-                chip[Register::A] = value;
+                let (value, carry, aux) = subtract(chip[A], value.wrapping_add((chip.c && carry) as u8));
+                chip[A] = value;
                 *chip.update_flags() = carry;
                 chip.a = aux;
                 7

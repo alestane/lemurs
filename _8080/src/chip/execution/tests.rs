@@ -1,5 +1,4 @@
 use super::*;
-use access::{Double::*, Register::*, Internal::*};
 use crate::{chip::*, SimpleBoard};
 use opcode::{Test::*, Flag::*};
 
@@ -24,7 +23,7 @@ macro_rules! assert_flags {
 fn add() {
     let mut env = Socket::default();
     let mut chip = State::new();
-    chip[Register::A] = 0x75;
+    chip[A] = 0x75;
     AddTo { value: 0x49, carry: false }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip.register[6], 0xBE);
     assert_flags!(chip, !a, !c, !z);
@@ -41,18 +40,18 @@ fn add() {
     assert_flags!(chip, !c, !z, !p);
 
     chip[L] = 0x5A;
-    Add{from:Byte::Single(L), carry: false}.execute_on(&mut chip, &mut env).unwrap();
+    Add{from:Single(L), carry: false}.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A], 0xDA);
     assert_flags!(chip, !a, !c, !z, !p);
     assert_flags!(chip, m);
 
     chip.c = true;
     chip[E] = 0b0001_1100;
-    Add{from: Byte::Single(E), carry: true}.execute_on(&mut chip, &mut env).unwrap();
+    Add{from: Single(E), carry: true}.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A], 0b1111_0111);
     assert_flags!(chip, a, m);
     assert_flags!(chip, !c, !z, !p);
-    Add{from: Byte::Single(L), carry: true}.execute_on(&mut chip, &mut env).unwrap();
+    Add{from: Single(L), carry: true}.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A], 0b0101_0001);
     assert_flags!(chip, a, c);
     assert_flags!(chip, !z, !p, !m);
@@ -68,7 +67,7 @@ fn add() {
 fn and() {
     let mut env = Socket::default();
     let mut chip = State::new();
-    chip[Register::A] = 0b01011101;
+    chip[A] = 0b01011101;
     AndWith { value: 0b11011011 }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip.register[6], 0b01011001);
     assert_flags!(chip, !a, !c, !z, !m);
@@ -79,10 +78,10 @@ fn and() {
     assert_flags!(chip, !a, !c, !m);
     assert_flags!(chip, z, p);
 
-    chip[Register::A] = 0b0110_1110;
-    chip[Register::D] = 0b1011_1001;
-    And{ from: Byte::Single(Register::D) }.execute_on(&mut chip, &mut env).unwrap();
-    assert_eq!(chip[Register::A], 0b0010_1000);
+    chip[A] = 0b0110_1110;
+    chip[D] = 0b1011_1001;
+    And{ from: Single(D) }.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[A], 0b0010_1000);
     assert_flags!(chip, p);
     assert_flags!(chip, !c, !m, !z);
 }
@@ -121,14 +120,14 @@ fn call() {
 fn dec() {
     let mut env = Socket::default();
     let mut chip = State::new();
-    chip[Register::L] = 0x50;
-    DecrementByte { register: Byte::Single(Register::L) }.execute_on(&mut chip, &mut env).unwrap();
-    assert_eq!(chip[Register::L], 0x4F);
+    chip[L] = 0x50;
+    DecrementByte { register: Single(L) }.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[L], 0x4F);
     assert_flags!(chip, a);
     assert_flags!(chip, !p);
-    chip[Register::H] = 0x4C;
-    DecrementWord { register: Internal::Wide(Double::HL) }.execute_on(&mut chip, &mut env).unwrap();
-    assert_eq!(chip[Double::HL], 0x4C4E);
+    chip[H] = 0x4C;
+    DecrementWord { register: Wide(HL) }.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[HL], 0x4C4E);
 }
 
 #[test]
@@ -157,7 +156,7 @@ fn xor() {
     assert_flags!(chip, m);
 
     chip[D] = 0b10100010;
-    ExclusiveOr { from: Byte::Single(D) }.execute_on(&mut chip, &mut env).unwrap();
+    ExclusiveOr { from: Single(D) }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A], 0);
     assert_flags!(chip, z, p);
     assert_flags!(chip, !c, !m);
@@ -173,7 +172,7 @@ fn compare() {
     assert_flags!(chip, a, c, m, p);
     assert_flags!(chip, !z);
     chip[L] = 0b0010_0110;
-    Compare{from: Byte::Single(L)}.execute_on(&mut chip, &mut env).unwrap();
+    Compare{from: Single(L)}.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A], 0x5B);
     assert_flags!(chip, a, p);
     assert_flags!(chip, !c, !m, !z);
@@ -202,12 +201,12 @@ fn inc() {
     let mut env = Socket::default();
     let mut chip = State::new();
     chip[D] = 0x17;
-    IncrementByte { register: Byte::Single(D) }.execute_on(&mut chip, &mut env).unwrap();
+    IncrementByte { register: Single(D) }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[D], 0x18);
     assert_flags!(chip, !a, !m, !z);
     assert_flags!(chip, p);
     chip[E] = 0xFF;
-    IncrementWord{register: Internal::Wide(DE)}.execute_on(&mut chip, &mut env).unwrap();
+    IncrementWord{register: Wide(DE)}.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[DE], 0x1900);
 }
 
@@ -230,7 +229,7 @@ fn jump() {
 fn transfer() {
     let mut env = Socket::default();
     let mut chip = State::new();
-    LoadExtendedWith { to: Internal::Wide(HL), value: 0x6472 }.execute_on(&mut chip, &mut env).unwrap();
+    LoadExtendedWith { to: Wide(HL), value: 0x6472 }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip.register[4], 0x72);
     assert_eq!(chip.register[5], 0x64);
     let mut env = SimpleBoard::default();
@@ -239,20 +238,20 @@ fn transfer() {
     assert_eq!(env[0x59D3], 0x5D);
     env[0x6275] = 0x6A;
     LoadAccumulator { address: 0x6275 }.execute_on(&mut chip, &mut env).unwrap();
-    assert_eq!(chip[Register::A], 0x6A);
+    assert_eq!(chip[A], 0x6A);
     env[0x8362] = 0x56;
     env[0x8363] = 0xA8;
     LoadHilo{address: 0x8362}.execute_on(&mut chip, &mut env).unwrap();
-    assert_eq!(chip[Register::H], 0xA8);
-    assert_eq!(chip[Register::L], 0x56);
+    assert_eq!(chip[H], 0xA8);
+    assert_eq!(chip[L], 0x56);
     StoreHilo{address: 0x7632}.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(env[0x7632], 0x56);
     assert_eq!(env[0x7633], 0xA8);
-    chip[Double::BC] = 0x7633;
-    LoadAccumulatorIndirect { register: Double::BC }.execute_on(&mut chip, &mut env).unwrap();
-    assert_eq!(chip[Register::A], 0xA8);
-    chip[Double::DE] = 0x8349;
-    StoreAccumulatorIndirect { register: Double::DE }.execute_on(&mut chip, &mut env).unwrap();
+    chip[BC] = 0x7633;
+    LoadAccumulatorIndirect { register: BC }.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[A], 0xA8);
+    chip[DE] = 0x8349;
+    StoreAccumulatorIndirect { register: DE }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(env[0x8349], 0xA8);
 }
 
@@ -266,8 +265,8 @@ fn move_() {
     chip[B] = 0x32;
     env[0x02A4] = 0xD4;
     env[0x0205] = 0xB2;
-    Move{to: Byte::Single(L), from: Byte::Single(A)}.execute_on(&mut chip, &mut env).unwrap();
-    Move{to: Byte::Single(B), from: Byte::Indirect}.execute_on(&mut chip, &mut env).unwrap();
+    Move{to: Single(L), from: Single(A)}.execute_on(&mut chip, &mut env).unwrap();
+    Move{to: Single(B), from: Byte::Indirect}.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[B], 0xB2);
 }
 
@@ -281,7 +280,7 @@ fn or() {
     assert_eq!(chip[A], 0b01010111);
     assert_flags!(chip, !c, !z, !m, !p);
     chip[H] = 0b1100_1001;
-    Or{from: Byte::Single(H)}.execute_on(&mut chip, &mut env).unwrap();
+    Or{from: Single(H)}.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A], 0b1101_1111);
     assert_flags!(chip, m);
     assert_flags!(chip, !c, !z, !p);
@@ -296,7 +295,7 @@ fn pop() {
     chip[HL] = 0x5B6E;
     chip.sp = 0x0238;
     [env[0x0238], env[0x0239]] = [0xB6, 0x4E];
-    Pop(Word::OnBoard(Internal::Wide(BC))).execute_on(&mut chip, &mut env).unwrap();
+    Pop(OnBoard(Wide(BC))).execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[BC], 0x4EB6);
     assert_eq!(chip.sp, 0x023A);
 }
@@ -309,14 +308,14 @@ fn push() {
     chip[BC] = 0x3256;
     chip[DE] = 0x2345;
     chip[HL] = 0x7654;
-    Push(Word::OnBoard(Internal::Wide(HL))).execute_on(&mut chip, &mut env).unwrap();
+    Push(OnBoard(Wide(HL))).execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(env[0x3FFE], 0x54);
     assert_eq!(env[0x3FFF], 0x76);
     assert_eq!(chip.sp, 0x3FFE);
 
     chip.register[6] = 0x90;
     AddTo { value: 0x73, carry: false }.execute_on(&mut chip, &mut env).unwrap();
-    Push(Word::ProgramStatus).execute_on(&mut chip, &mut env).unwrap();
+    Push(ProgramStatus).execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip.sp, 0x3FFC);
     assert_eq!(env[0x3FFC], 0x03);
     assert_eq!(env[0x3FFD], 0b00000111);
@@ -379,20 +378,20 @@ fn subtract() {
     assert_flags!(chip, c, m, p);
     assert_flags!(chip, !z);
 
-    chip[Register::C] = 0b0001_0101;
-    Subtract{from: Byte::Single(Register::C), carry: false}.execute_on(&mut chip, &mut env).unwrap();
-    assert_eq!(chip[Register::A], 0b1010_1110);
+    chip[C] = 0b0001_0101;
+    Subtract{from: Single(C), carry: false}.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[A], 0b1010_1110);
     assert_flags!(chip, m);
     assert_flags!(chip, !c, !z, !a, !p);
 
-    chip[Register::L] = 0b0100_1001;
-    Subtract{ from: Byte::Single(Register::L), carry: true}.execute_on(&mut chip, &mut env).unwrap();
-    assert_eq!(chip[Register::A], 0b0110_0101);
+    chip[L] = 0b0100_1001;
+    Subtract{ from: Single(L), carry: true}.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[A], 0b0110_0101);
     assert_flags!(chip, a, p);
     assert_flags!(chip, !c, !z, !m);
     chip.c = true;
-    Subtract{from: Byte::Single(Register::C), carry: true}.execute_on(&mut chip, &mut env).unwrap();
-    assert_eq!(chip[Register::A], 0b0100_1111);
+    Subtract{from: Single(C), carry: true}.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[A], 0b0100_1111);
     assert_flags!(chip, !a, !c, !z, !m, !p);
 }
 
@@ -414,7 +413,7 @@ fn move_i() {
     let mut env = SimpleBoard::default();
     let mut chip = State::new();
     chip[HL] = 0x0421;
-    MoveData { value: 0x02, to: Byte::Single(H) }.execute_on(&mut chip, &mut env).unwrap();
+    MoveData { value: 0x02, to: Single(H) }.execute_on(&mut chip, &mut env).unwrap();
     MoveData { value: 0x72, to: Byte::Indirect }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(env[0x0221], 0x72);
 }

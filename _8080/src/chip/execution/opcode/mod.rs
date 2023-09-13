@@ -1,6 +1,6 @@
 use core::fmt::UpperHex;
 
-use crate::{convert::TryFrom, chip::access::{Byte, Register, Word, Double, Internal}};
+use crate::{convert::TryFrom, chip::access::{*, Byte::*, Register::*, Word::*, Double::*, Internal::*}};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Op {
@@ -50,10 +50,10 @@ use Op::*;
 impl From<u8> for Internal {
     fn from(value: u8) -> Self {
         match value & 0b00_11_0000 {
-            0b00_00_0000 => Internal::Wide(Double::BC),
-            0b00_01_0000 => Internal::Wide(Double::DE),
-            0b00_10_0000 => Internal::Wide(Double::HL),
-            0b00_11_0000 => Internal::StackPointer,
+            0b00_00_0000 => Wide(BC),
+            0b00_01_0000 => Wide(DE),
+            0b00_10_0000 => Wide(HL),
+            0b00_11_0000 => StackPointer,
             _ => unreachable!(),
         }
     }
@@ -62,14 +62,14 @@ impl From<u8> for Internal {
 impl From<u8> for Byte {
     fn from(value: u8) -> Self {
         match value & 0b00_111_000 {
-            0b00_000_000 => Byte::Single(Register::B),
-            0b00_001_000 => Byte::Single(Register::C),
-            0b00_010_000 => Byte::Single(Register::D),
-            0b00_011_000 => Byte::Single(Register::E),
-            0b00_100_000 => Byte::Single(Register::H),
-            0b00_101_000 => Byte::Single(Register::L),
+            0b00_000_000 => Single(B),
+            0b00_001_000 => Single(C),
+            0b00_010_000 => Single(D),
+            0b00_011_000 => Single(E),
+            0b00_100_000 => Single(H),
+            0b00_101_000 => Single(L),
             0b00_110_000 => Byte::Indirect,
-            0b00_111_000 => Byte::Single(Register::A),
+            0b00_111_000 => Single(A),
             _ => unreachable!(),
         }
     }
@@ -275,8 +275,8 @@ impl TryFrom<[u8;1]> for Op {
                 b11_00_1111::DecrementExtended => return Ok(DecrementWord{register: Internal::from(value)}),
                 b11_00_1111::IncrementExtended => return Ok(IncrementWord { register: Internal::from(value) }),
                 b11_00_1111::DoubleAdd => return Ok(DoubleAdd{register: Internal::from(value)}),
-                b11_00_1111::Push => return Ok(Push(match Internal::from(value) { Internal::StackPointer => Word::ProgramStatus, wide => Word::OnBoard(wide)})),
-                b11_00_1111::Pop => return Ok(Pop(match Internal::from(value) { Internal::StackPointer => Word::ProgramStatus, wide => Word::OnBoard(wide)})),
+                b11_00_1111::Push => return Ok(Push(match Internal::from(value) { StackPointer => ProgramStatus, wide => OnBoard(wide)})),
+                b11_00_1111::Pop => return Ok(Pop(match Internal::from(value) { StackPointer => ProgramStatus, wide => OnBoard(wide)})),
                 _ => value,
             };
             let _value = match (value & 0b11_111_000, value << 3) {
@@ -299,10 +299,10 @@ impl TryFrom<[u8;1]> for Op {
             };
             let _value = match value & 0b111_0_1111 {
                 b111_0_1111::LoadAccumulatorIndirect => return Ok(LoadAccumulatorIndirect { 
-                    register: if value & 0b000_1_0000 != 0 { Double::DE } else { Double::BC }
+                    register: if value & 0b000_1_0000 != 0 { DE } else { BC }
                 }),
                 b111_0_1111::StoreAccumulatorIndirect => return Ok(StoreAccumulatorIndirect { 
-                    register: if value & 0b000_1_0000 != 0 { Double::DE } else { Double::BC }
+                    register: if value & 0b000_1_0000 != 0 { DE } else { BC }
                 }),
                 _ => value,
             };
