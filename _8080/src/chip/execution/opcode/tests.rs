@@ -189,6 +189,8 @@ fn push() {
 fn rotate() {
     let op = decode(&[0x0F, 0x0F]).unwrap();
     assert_eq!(op.0, RotateRightCarrying);
+    let op = decode(&[0x07]).unwrap();
+    assert_eq!(op.0, RotateLeftCarrying);
 }
 
 #[test]

@@ -319,6 +319,12 @@ impl Op {
                     5
                 }
             }
+            RotateLeftCarrying => {
+                let accumulator = chip[A].0;
+                chip.c = accumulator & 0x80 != 0;
+                chip[A] = Wrapping(accumulator.rotate_left(1));
+                4
+            }
             RotateRightCarrying => {
                 let accumulator = chip[A].0;
                 chip.c = accumulator & 0x01 != 0;

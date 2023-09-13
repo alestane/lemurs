@@ -375,6 +375,9 @@ fn rotate() {
     RotateRightCarrying.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(chip[A].0, 0b0101_1101);
     assert_flags!(chip, !c);
+    RotateLeftCarrying.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[A].0, 0b1011_1010);
+    assert_flags!(chip, !c);
 }
 
 #[test]

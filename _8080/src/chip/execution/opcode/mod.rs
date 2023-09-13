@@ -41,6 +41,7 @@ pub enum Op {
     Reset{vector: u8},
     Return,
     ReturnIf(Test),
+    RotateLeftCarrying,
     RotateRightCarrying,
     StoreAccumulator{address: bits::u16},
     StoreAccumulatorIndirect{register: Double},
@@ -264,6 +265,7 @@ impl TryFrom<[u8;1]> for Op {
                 b11111111::Halt => return Ok(Halt),
                 b11111111::Return => return Ok(Return),
                 b11111111::ExchangeTopWithHilo => return Ok(ExchangeTopWithHilo),
+                b11111111::RotateLeftCarrying => return Ok(RotateLeftCarrying),
                 b11111111::RotateRightCarrying => return Ok(RotateRightCarrying),
                 b11111111::SetCarry => return Ok(CarryFlag(true)),
                 b11111111::ComplementCarry => return Ok(CarryFlag(false)),
@@ -378,10 +380,10 @@ impl Op {
             AddTo{..} | AndWith{..} | ExclusiveOrWith{..} | OrWith{..} | SubtractBy{..} | CompareWith{..} | MoveData{..}
                 => 2,
             NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | 
-            Move{..} | RotateRightCarrying | IncrementByte {..} | DecrementByte {..} | Add{..}  | Subtract{..} |
-            And{..} | ExclusiveOr{..} | Or{..} | Compare{..} | IncrementWord{..} | DecrementWord {..} |
-            LoadAccumulatorIndirect {..} | StoreAccumulatorIndirect{..} | DoubleAdd{..} | CarryFlag(..) |
-            DecimalAddAdjust | ComplementAccumulator
+            Move{..} | RotateLeftCarrying | RotateRightCarrying | IncrementByte {..} | DecrementByte {..} | 
+            Add{..}  | Subtract{..} | And{..} | ExclusiveOr{..} | Or{..} | Compare{..} | 
+            IncrementWord{..} | DecrementWord {..} | LoadAccumulatorIndirect {..} | StoreAccumulatorIndirect{..} | 
+            DoubleAdd{..} | CarryFlag(..) | DecimalAddAdjust | ComplementAccumulator
                 => 1,
         }
     }
