@@ -69,15 +69,21 @@ fn subtract(base: u8, by: u8) -> (u8, bool, bool) {
     (value, by != 0 && !carry, (value ^ aux) & 0x10 != 0)
 }
 
+macro_rules! byte {
+    {$chip:expr, $from:ident, $bus:expr, $onboard: expr, $external: expr} => {
+        match $chip.resolve_byte($from) {
+            Single(register) => ($chip[register], $onboard),
+            Byte::RAM(address) => ($bus.read(address), $external),
+            _ => unreachable!()
+        }
+    };
+}
+
 impl Op {
     fn execute_on<H: Harness>(self, chip: &mut State, mut bus: impl DerefMut<Target = H>) -> OpOutcome {
         let cycles = match self {
             Add { from, carry } => {
-                let (value, time) = match chip.resolve_byte(from) {
-                    Single(register) => (chip[register], 4),
-                    Byte::RAM(address) => ( bus.read(address), 7),
-                    _ => unreachable!(),
-                };
+                let (value, time) = byte!{chip, from, bus, 4, 7};
                 AddTo{value, carry}.execute_on(chip, bus)?;
                 time
             }
@@ -92,11 +98,7 @@ impl Op {
                 7
             }
             And{from} => {
-                let (value, time) = match chip.resolve_byte(from) {
-                    Single(register) => (chip[register], 4),
-                    Byte::RAM(address) => (bus.read(address), 7),
-                    _ => unreachable!()
-                };
+                let (value, time) = byte!{chip, from, bus, 4, 7};
                 AndWith{value}.execute_on(chip, bus)?;
                 time
             }
@@ -117,11 +119,7 @@ impl Op {
                 11
             }
             Compare{from} => {
-                let (value, time) = match chip.resolve_byte(from) {
-                    Single(register) => (chip[register], 4),
-                    Byte::RAM(address) => (bus.read(address), 7),
-                    _ => unreachable!()
-                };
+                let (value, time) = byte!{chip, from, bus, 4, 7};
                 CompareWith { value }.execute_on(chip, bus)?;
                 time
             }
@@ -164,11 +162,7 @@ impl Op {
                 18
             }
             ExclusiveOr { from } => {
-                let (value, time) = match chip.resolve_byte(from) {
-                    Single(register) => (chip[register], 4),
-                    Byte::RAM(addr) => (bus.read(addr), 7),
-                    _ => unreachable!(),
-                };
+                let (value, time) = byte!(chip, from, bus, 4, 7);
                 ExclusiveOrWith{value}.execute_on(chip, bus)?;
                 time
             }
@@ -249,11 +243,7 @@ impl Op {
                 }
             }
             Or{from} => {
-                let (value, time) = match chip.resolve_byte(from) {
-                    Single(register) => (chip[register], 4),
-                    Byte::RAM(address) => (bus.read(address), 7),
-                    _ => unreachable!()
-                };
+                let (value, time) = byte!{chip, from, bus, 4, 7};
                 OrWith{value}.execute_on(chip, bus)?;
                 time
             }
@@ -319,11 +309,7 @@ impl Op {
                 16
             }
             Subtract { from, carry } => {
-                let (value, time) = match chip.resolve_byte(from) {
-                    Single(register) => (chip[register], 4),
-                    Byte::RAM(address) => ( bus.read(address), 7),
-                    _ => unreachable!(),
-                };
+                let (value, time) = byte!{chip, from, bus, 4, 7};
                 SubtractBy{value, carry}.execute_on(chip, bus)?;
                 time
             }
