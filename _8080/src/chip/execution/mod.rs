@@ -81,6 +81,7 @@ macro_rules! byte {
 }
 
 impl Op {
+    #[cfg_attr(debug_assertions, allow(unreachable_patterns))]
     fn execute_on<H: Harness>(self, chip: &mut State, mut bus: impl DerefMut<Target = H>) -> OpOutcome {
         let cycles = match self {
             Add { from, carry } => {
