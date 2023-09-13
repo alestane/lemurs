@@ -240,3 +240,10 @@ fn internals() {
     let op = decode(&[0x3F, 0x00]).unwrap();
     assert_eq!(op.0, CarryFlag(false));
 }
+
+#[test]
+fn all() {
+    for op in 0u8.. {
+        decode(&[op, 0x45, 0x3B]).unwrap();
+    }
+}
