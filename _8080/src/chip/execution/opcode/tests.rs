@@ -214,3 +214,11 @@ fn compare() {
     let op = decode(&[0xBF]).unwrap();
     assert_eq!(op.0, Compare{from: Single(A)});
 }
+
+#[test]
+fn internals() {
+    let op = decode(&[0x37]).unwrap();
+    assert_eq!(op.0, CarryFlag(true));
+    let op = decode(&[0x3F, 0x00]).unwrap();
+    assert_eq!(op.0, CarryFlag(false));
+}

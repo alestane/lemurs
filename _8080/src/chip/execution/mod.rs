@@ -118,6 +118,10 @@ impl Op {
             } else {
                 11
             }
+            CarryFlag(set) => {
+                chip.c = set || !chip.c;
+                4
+            }
             Compare{from} => {
                 let (value, time) = byte!{chip, from, bus, 4, 7};
                 CompareWith { value }.execute_on(chip, bus)?;

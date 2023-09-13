@@ -417,3 +417,13 @@ fn move_i() {
     MoveData { value: 0x72, to: Byte::Indirect }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(env[0x0221], 0x72);
 }
+
+#[test]
+fn internals() {
+    let mut env = Socket::default();
+    let mut chip = State::new();
+    CarryFlag(true).execute_on(&mut chip, &mut env).unwrap();
+    assert!(chip.c);
+    CarryFlag(false).execute_on(&mut chip, &mut env).unwrap();
+    assert!(!chip.c);
+}

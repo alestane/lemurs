@@ -11,6 +11,7 @@ pub enum Op {
     AndWith{value: u8},
     Call{sub: u16},
     CallIf(Test, u16),
+    CarryFlag(bool),
     Compare{from: Byte},
     CompareWith{ value: u8 },
     DecrementByte{register: Byte},
@@ -262,6 +263,8 @@ impl TryFrom<[u8;1]> for Op {
                 b11111111::Return => return Ok(Return),
                 b11111111::ExchangeTopWithHilo => return Ok(ExchangeTopWithHilo),
                 b11111111::RotateRightCarrying => return Ok(RotateRightCarrying),
+                b11111111::SetCarry => return Ok(CarryFlag(true)),
+                b11111111::ComplementCarry => return Ok(CarryFlag(false)),
                 _ => value
             };
             let _value = match value & 0b11_000_111 {
@@ -372,7 +375,7 @@ impl Op {
             NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | 
             Move{..} | RotateRightCarrying | IncrementByte {..} | DecrementByte {..} | Add{..}  | Subtract{..} |
             And{..} | ExclusiveOr{..} | Or{..} | Compare{..} | IncrementWord{..} | DecrementWord {..} |
-            LoadAccumulatorIndirect {..} | StoreAccumulatorIndirect{..} | DoubleAdd{..}
+            LoadAccumulatorIndirect {..} | StoreAccumulatorIndirect{..} | DoubleAdd{..} | CarryFlag(..)
                 => 1,
         }
     }
