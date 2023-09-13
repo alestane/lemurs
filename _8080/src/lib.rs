@@ -43,13 +43,13 @@ pub use core::result::Result;
 
 pub use chip::State;
 
-#[cfg(debug_assertions)]
+#[cfg(feature="open")]
 pub mod support {
     use super::*;
     pub use chip::Socket;
     pub use chip::access::*;
 }
-
+#[cfg(feature="open")]
 pub mod op {
     pub use super::chip::opcode::{Op::{self, *}, Flag::*, Test::*};
 }
