@@ -14,6 +14,8 @@ pub enum Op {
     CarryFlag(bool),
     Compare{from: Byte},
     CompareWith{ value: u8 },
+    ComplementAccumulator,
+    DecimalAddAdjust,
     DecrementByte{register: Byte},
     DecrementWord{register: Internal},
     DoubleAdd{register: Internal},
@@ -265,6 +267,8 @@ impl TryFrom<[u8;1]> for Op {
                 b11111111::RotateRightCarrying => return Ok(RotateRightCarrying),
                 b11111111::SetCarry => return Ok(CarryFlag(true)),
                 b11111111::ComplementCarry => return Ok(CarryFlag(false)),
+                b11111111::DecimalAddAdjust => return  Ok(DecimalAddAdjust),
+                b11111111::ComplementAccumulator => return Ok(ComplementAccumulator),
                 _ => value
             };
             let _value = match value & 0b11_000_111 {
@@ -375,7 +379,8 @@ impl Op {
             NOP(..) | Push(..) | Reset{..} | ExchangeDoubleWithHilo | Return | Halt | Pop(..) | ExchangeTopWithHilo | 
             Move{..} | RotateRightCarrying | IncrementByte {..} | DecrementByte {..} | Add{..}  | Subtract{..} |
             And{..} | ExclusiveOr{..} | Or{..} | Compare{..} | IncrementWord{..} | DecrementWord {..} |
-            LoadAccumulatorIndirect {..} | StoreAccumulatorIndirect{..} | DoubleAdd{..} | CarryFlag(..)
+            LoadAccumulatorIndirect {..} | StoreAccumulatorIndirect{..} | DoubleAdd{..} | CarryFlag(..) |
+            DecimalAddAdjust | ComplementAccumulator
                 => 1,
         }
     }

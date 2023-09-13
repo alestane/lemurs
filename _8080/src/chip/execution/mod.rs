@@ -133,6 +133,29 @@ impl Op {
                 chip.a = aux;
                 7
             }
+            ComplementAccumulator => {
+                chip[A] = !chip[A];
+                4
+            }
+            DecimalAddAdjust => {
+                let aux = if chip[A]& 0x0F > 0x09 {
+                    chip[A] += 0x06;
+                    true
+                } else {
+                    if chip.a { chip[A] = chip[A].wrapping_add(6); }
+                    false
+                };
+                let carry = if chip[A] >> 4 > 0x09 {
+                    chip[A] = chip[A].wrapping_add(0x06 << 4);
+                    true
+                } else {
+                    if chip.c { chip[A] += 0x06 << 4; }
+                    false
+                };
+                *chip.update_flags() = carry;
+                chip.a = aux;
+                4
+            }
             DecrementByte { register } => {
                 let (value, time) = match chip.resolve_byte(register) {
                     Single(reg) => { chip[reg] = chip[reg].wrapping_sub(1); (chip[reg], 5)}

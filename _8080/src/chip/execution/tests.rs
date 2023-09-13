@@ -64,6 +64,17 @@ fn add() {
 }
 
 #[test]
+fn decimal() {
+    let mut env = Socket::default();
+    let mut chip = State::new();
+    chip[A] = 0x9B;
+    DecimalAddAdjust.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[A], 0x01);
+    assert_flags!(chip, a, c);
+    assert_flags!(chip, !z, !m, !p);
+}
+
+#[test]
 fn and() {
     let mut env = Socket::default();
     let mut chip = State::new();
@@ -183,6 +194,15 @@ fn compare() {
     // 0000 0000
     assert_flags!(chip, p, m);
     assert_flags!(chip, !a, !z, !c);
+}
+
+#[test]
+fn not() {
+    let mut env = Socket::default();
+    let mut chip = State::new();
+    chip[A] = 0b0101_1101;
+    ComplementAccumulator.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[A], 0b1010_0010);
 }
 
 #[test]

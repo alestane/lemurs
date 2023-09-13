@@ -65,6 +65,12 @@ fn or() {
 }
 
 #[test]
+fn not() {
+    let op = decode(&[0x2F]).unwrap();
+    assert_eq!(op.0, ComplementAccumulator);
+}
+
+#[test]
 fn xthl() {
     let op = decode(&[0xE3, 0x1D]).unwrap();
     assert_eq!(op.0, ExchangeTopWithHilo);
@@ -160,6 +166,8 @@ fn add() {
     assert_eq!(op.0, Add{from: Single(H), carry: false});
     let op = decode(&[0x89]).unwrap();
     assert_eq!(op.0, Add{from: Single(C), carry: true });
+    let op = decode(&[0x27]).unwrap();
+    assert_eq!(op.0, DecimalAddAdjust);
 }
 
 #[test]
