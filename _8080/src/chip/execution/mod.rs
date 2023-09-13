@@ -1,5 +1,5 @@
 use core::ops::DerefMut;
-use crate::{num::NonZeroU8, String, Machine, Harness};
+use crate::{raw, bits::*, num::{NonZeroU8, Wrapping}, String, Machine, Harness};
 use super::{State, access::{*, Register::*, Byte::*, Double::*, Internal::*, Word::*}};
 
 pub mod opcode;
@@ -18,7 +18,7 @@ impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
 		if !self.chip.active { return Ok(NonZeroU8::new(1)) };
         let (op, len) = Op::extract(self.board.deref_mut(), self.chip.pc)
             .map_err(|e| panic!("Couldn't extract opcode from {e:X} at {:#06X}", self.pc)).unwrap();
-        self.chip.pc += len as u16; 
+        self.chip.pc += Wrapping(len as raw::u16); 
         let outcome = op.execute_on(&mut self.chip, self.board.deref_mut());
         match outcome {
             Ok(Some(_)) => (),
@@ -35,7 +35,7 @@ impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
 		if !self.active { return NonZeroU8::new(1) };
         let (op, len) = Op::extract(self.board.deref(), self.pc)
             .map_err(|e| panic!("Couldn't extract opcode from {e:X?}")).unwrap();
-        self.pc += len as u16; 
+        self.pc += Wrapping(len as raw::u16); 
         let elapsed = op.execute_on(&mut self.chip, self.board.deref_mut());
         if elapsed.is_none() { self. active = false; }
         elapsed
@@ -56,17 +56,17 @@ impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
 
     pub fn reset_to(&mut self, index: usize) -> Result<bool, opcode::OutOfRange> {
         match index {
-            0..8 => Ok(self.interrupt(Reset{vector: index as u8}).ok().unwrap()),
+            0..8 => Ok(self.interrupt(Reset{vector: index as raw::u8}).ok().unwrap()),
             _ => Err(opcode::OutOfRange)
         }
     }
     }
 
 fn subtract(base: u8, by: u8) -> (u8, bool, bool) {
-    let value = (!by).wrapping_add(1);
+    let value = (!by) + Wrapping(1);
     let aux = base ^ value;
-    let (value, carry) = base.overflowing_add(value);
-    (value, by != 0 && !carry, (value ^ aux) & 0x10 != 0)
+    let (value, carry) = base.0.overflowing_add(value.0);
+    (Wrapping(value), by.0 != 0 && !carry, (value ^ aux.0) & 0x10 != 0)
 }
 
 macro_rules! byte {
@@ -91,10 +91,11 @@ impl Op {
                 let carry_in = chip.c && carry;
                 let accumulator = &mut chip[A];
                 let aux = *accumulator ^ value;
-                let (value, carry) = accumulator.overflowing_add(value.wrapping_add(carry_in as u8));
+                let (value, carry) = accumulator.0.overflowing_add(value.0.wrapping_add(carry_in as raw::u8));
+                let value = Wrapping(value);
                 *accumulator = value;
                 *chip.update_flags() = carry;
-                chip.a = (value ^ aux) & 0x10 != 0;
+                chip.a = (value ^ aux).0 & 0x10 != 0;
                 7
             }
             And{from} => {
@@ -138,15 +139,15 @@ impl Op {
                 4
             }
             DecimalAddAdjust => {
-                let aux = if chip[A]& 0x0F > 0x09 {
+                let aux = if chip[A].0  & 0x0F > 0x09 {
                     chip[A] += 0x06;
                     true
                 } else {
-                    if chip.a { chip[A] = chip[A].wrapping_add(6); }
+                    if chip.a { chip[A] = chip[A] + Wrapping(6); }
                     false
                 };
-                let carry = if chip[A] >> 4 > 0x09 {
-                    chip[A] = chip[A].wrapping_add(0x06 << 4);
+                let carry = if chip[A] >> 4 > Wrapping(0x09) {
+                    chip[A] += 0x06 << 4;
                     true
                 } else {
                     if chip.c { chip[A] += 0x06 << 4; }
@@ -158,24 +159,25 @@ impl Op {
             }
             DecrementByte { register } => {
                 let (value, time) = match chip.resolve_byte(register) {
-                    Single(reg) => { chip[reg] = chip[reg].wrapping_sub(1); (chip[reg], 5)}
+                    Single(reg) => { chip[reg] -= 1; (chip[reg], 5)}
                     Byte::RAM(address) => { 
-                        let value = bus.read(address).wrapping_sub(1); 
+                        let value = bus.read(address) - Wrapping(1); 
                         bus.write(value, address);
                         (value, 10)
                     }
                     _ => unreachable!()
                 };
                 *chip.update_flags_for(value) = false;
-                chip.a = (value ^ value.wrapping_add(1)) & 0x10 != 0;
+                chip.a = (value ^ (value + Wrapping(1))).0 & 0x10 != 0;
                 time
             }
             DecrementWord{register} => {
-                chip[register] = chip[register].wrapping_sub(1);
+                chip[register] -= 1;
                 5
             }
             DoubleAdd { register } => {
-                (chip[HL], chip.c) = chip[HL].overflowing_add(chip[register]);
+                let (value, carry) = chip[HL].0.overflowing_add(chip[register].0);
+                (chip[HL], chip.c) = (Wrapping(value), carry);
                 10
             }
             ExchangeDoubleWithHilo => {
@@ -204,20 +206,20 @@ impl Op {
             }
             IncrementByte { register } => {
                 let (value, time) = match chip.resolve_byte(register) {
-                    Single(reg) => { chip[reg] = chip[reg].wrapping_add(1); (chip[reg], 5)}
+                    Single(reg) => { chip[reg] += 1; (chip[reg], 5)}
                     Byte::RAM(address) => { 
-                        let value = bus.read(address).wrapping_add(1); 
+                        let value = bus.read(address) + Wrapping(1); 
                         bus.write(value, address);
                         (value, 10)
                     }
                     _ => unreachable!()
                 };
                 *chip.update_flags_for(value) = false;
-                chip.a = (value ^ value.wrapping_sub(1)) & 0x10 != 0;
+                chip.a = (value ^ (value - Wrapping(1))).0 & 0x10 != 0;
                 time
             }
             IncrementWord { register } => {
-                chip[register] = chip[register].wrapping_add(1);
+                chip[register] += 1;
                 5
             }
             Jump{to} => {
@@ -283,8 +285,8 @@ impl Op {
                 match target {
                     OnBoard(internal) => chip[internal] = bus.read_word(chip.pop()),
                     ProgramStatus => {
-                        let [accumulator, status] = bus.read_word(chip.pop()).to_le_bytes();
-                        chip[A] = accumulator;
+                        let [accumulator, status] = bus.read_word(chip.pop()).0.to_le_bytes();
+                        chip[A] = Wrapping(accumulator);
                         chip.extract_flags(status);
                     }
                     _ => unreachable!()
@@ -302,7 +304,7 @@ impl Op {
             }
             Reset{vector} => {
                 bus.write_word(chip.pc, chip.push());
-                chip.pc = vector as u16 * 8;
+                chip.pc = Wrapping(vector as raw::u16 * 8);
                 11
             }
             Return => {
@@ -318,9 +320,9 @@ impl Op {
                 }
             }
             RotateRightCarrying => {
-                let accumulator = chip[A];
+                let accumulator = chip[A].0;
                 chip.c = accumulator & 0x01 != 0;
-                chip[A] = accumulator.rotate_right(1);
+                chip[A] = Wrapping(accumulator.rotate_right(1));
                 4
             }
             StoreAccumulator { address } => {
@@ -341,7 +343,7 @@ impl Op {
                 time
             }
             SubtractBy{ value, carry } => {
-                let (value, carry, aux) = subtract(chip[A], value.wrapping_add((chip.c && carry) as u8));
+                let (value, carry, aux) = subtract(chip[A], value + Wrapping((chip.c && carry) as raw::u8));
                 chip[A] = value;
                 *chip.update_flags() = carry;
                 chip.a = aux;

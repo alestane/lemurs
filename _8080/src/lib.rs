@@ -19,11 +19,24 @@ mod foundation {
     pub use alloc::{boxed, vec, string};
     pub use core::{array, convert, num, result, ops, slice};
 }
-pub use foundation::string::String;
+pub use foundation::{string::String, num::Wrapping};
 use foundation::*;
 pub use boxed::Box;
 
 mod chip;
+
+#[allow(non_camel_case_types)]
+mod raw {
+    pub type u8 = core::primitive::u8;
+    pub type u16 = core::primitive::u16;
+}
+
+#[allow(non_camel_case_types)]
+mod bits {
+    use super::*;
+    pub type u8 = crate::num::Wrapping<raw::u8>;
+    pub type u16 = crate::num::Wrapping<raw::u16>;
+}
 
 use crate::ops::{Deref, DerefMut, Index, IndexMut, Range, RangeFull, RangeFrom, RangeTo, RangeToInclusive};
 pub use core::result::Result;
@@ -42,18 +55,18 @@ pub mod op {
 }
 
 pub trait Harness {
-    fn read(&self, from: u16) -> u8;
-    fn read_word(&self, from: u16) -> u16 {
-        u16::from_le_bytes([self.read(from), self.read(from + 1)])
+    fn read(&self, from: bits::u16) -> bits::u8;
+    fn read_word(&self, from: bits::u16) -> bits::u16 {
+        Wrapping(u16::from_le_bytes([self.read(from).0, self.read(from + Wrapping(1)).0]))
     }
-    fn write(&mut self, value: u8, to: u16) { let _ = (value, to); }
-    fn write_word(&mut self, value: u16, to: u16) {
-        for (index, byte) in value.to_le_bytes().into_iter().enumerate() {
-            self.write(byte, to + index as u16)
+    fn write(&mut self, value: bits::u8, to: bits::u16) { let _ = (value, to); }
+    fn write_word(&mut self, value: bits::u16, to: bits::u16) {
+        for (index, byte) in value.0.to_le_bytes().into_iter().enumerate() {
+            self.write(num::Wrapping(byte), to + num::Wrapping(index as u16))
         }
     }
-	fn input(&mut self, port: u8) -> u8;
-	fn output(&mut self, port: u8, value: u8);
+	fn input(&mut self, port: bits::u8) -> bits::u8;
+	fn output(&mut self, port: bits::u8, value: bits::u8);
     #[cfg(debug_assertions)]
     fn did_execute(&mut self, client: &State, did: op::Op) -> Result<Option<op::Op>, String> { let _ = (client, did); Ok( None ) }
 }
@@ -80,19 +93,19 @@ impl Deref for SimpleBoard {
 }
 
 impl Harness for SimpleBoard {
-    fn read(&self, from: u16) -> u8 { self[from] }
-    fn read_word(&self, from: u16) -> u16 {
-        u16::from_le_bytes([self.ram[from as usize], self.ram[from as usize + 1]])
+    fn read(&self, from: bits::u16) -> bits::u8 { num::Wrapping(self[from.0]) }
+    fn read_word(&self, from: bits::u16) -> bits::u16 {
+        Wrapping(u16::from_le_bytes([self.ram[from.0 as usize], self.ram[from.0 as usize + 1]]))
     }
-    fn write(&mut self, value: u8, to: u16) { self.ram[to as usize] = value; }
-    fn write_word(&mut self, value: u16, to: u16) {
-        [self.ram[to as usize], self.ram[to.wrapping_add(1) as usize]] = value.to_le_bytes();
+    fn write(&mut self, value: bits::u8, to: bits::u16) { self.ram[to.0 as usize] = value.0; }
+    fn write_word(&mut self, value: bits::u16, to: bits::u16) {
+        [self.ram[to.0 as usize], self.ram[to.0.wrapping_add(1) as usize]] = value.0.to_le_bytes();
     }
-	fn input(&mut self, port: u8) -> u8 {
-		self.port_in[port as usize]
+	fn input(&mut self, port: bits::u8) -> bits::u8 {
+		Wrapping(self.port_in[port.0 as usize])
 	}
-	fn output(&mut self, port: u8, value: u8) {
-		self.port_out[port as usize] = value
+	fn output(&mut self, port: bits::u8, value: bits::u8) {
+		self.port_out[port.0 as usize] = value.0
 	}
 }
 

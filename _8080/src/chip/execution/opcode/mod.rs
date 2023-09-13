@@ -1,19 +1,19 @@
 use core::fmt::UpperHex;
 
-use crate::{convert::TryFrom, chip::access::{*, Byte::*, Register::*, Word::*, Double::*, Internal::*}};
+use crate::{bits, num::Wrapping, convert::TryFrom, chip::access::{*, Byte::*, Register::*, Word::*, Double::*, Internal::*}};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Op {
     NOP(u8),
     Add{from: Byte, carry: bool},
-    AddTo{value: u8, carry: bool},
+    AddTo{value: bits::u8, carry: bool},
     And{from: Byte},
-    AndWith{value: u8},
-    Call{sub: u16},
-    CallIf(Test, u16),
+    AndWith{value: bits::u8},
+    Call{sub: bits::u16},
+    CallIf(Test, bits::u16),
     CarryFlag(bool),
     Compare{from: Byte},
-    CompareWith{ value: u8 },
+    CompareWith{value: bits::u8},
     ComplementAccumulator,
     DecimalAddAdjust,
     DecrementByte{register: Byte},
@@ -22,31 +22,31 @@ pub enum Op {
     ExchangeDoubleWithHilo, 
     ExchangeTopWithHilo,
     ExclusiveOr{ from: Byte },
-    ExclusiveOrWith{value: u8},
+    ExclusiveOrWith{value: bits::u8},
     Halt,
     IncrementByte{register: Byte},
     IncrementWord{register: Internal},
-    Jump{to: u16},
-    JumpIf(Test, u16),
-    LoadAccumulator{address: u16},
+    Jump{to: bits::u16},
+    JumpIf(Test, bits::u16),
+    LoadAccumulator{address: bits::u16},
     LoadAccumulatorIndirect{register: Double},
-    LoadExtendedWith{to: Internal, value: u16 },
-    LoadHilo{address: u16},
+    LoadExtendedWith{to: Internal, value: bits::u16 },
+    LoadHilo{address: bits::u16},
     Move{to: Byte, from: Byte},
-    MoveData{value: u8, to: Byte},
+    MoveData{value: bits::u8, to: Byte},
     Or{from: Byte},
-    OrWith{value: u8},
+    OrWith{value: bits::u8},
     Push(Word),
     Pop(Word),
     Reset{vector: u8},
     Return,
     ReturnIf(Test),
     RotateRightCarrying,
-    StoreAccumulator{address: u16},
+    StoreAccumulator{address: bits::u16},
     StoreAccumulatorIndirect{register: Double},
-    StoreHilo{address: u16},
+    StoreHilo{address: bits::u16},
     Subtract{from: Byte, carry: bool},
-    SubtractBy{value: u8, carry: bool},
+    SubtractBy{value: bits::u8, carry: bool},
 }
 use Op::*;
 
@@ -322,6 +322,7 @@ impl TryFrom<[u8;2]> for Op {
     type Error = [u8;2];
     fn try_from(code: [u8;2]) -> Result<Self, Self::Error> {
         let [action, value] = code;
+        let value = Wrapping(value);
         let action = match action {
             b11111111::AddImmediate => return Ok(AddTo { value, carry: false }),
             b11111111::AddImmediateCarrying => return Ok(AddTo{ value, carry: true }),
@@ -345,7 +346,7 @@ impl TryFrom<[u8;3]> for Op {
     type Error = [u8;3];
     fn try_from(value: [u8;3]) -> Result<Self, Self::Error> {
         let action = value[0];
-        let data = u16::from_le_bytes([value[1], value[2]]);
+        let data = Wrapping(u16::from_le_bytes([value[1], value[2]]));
         match action {
             b11111111::LoadHiloDirect => return Ok(LoadHilo{address: data}),
             b11111111::StoreHiloDirect => return Ok(StoreHilo{address: data}),
@@ -385,16 +386,16 @@ impl Op {
         }
     }
 
-    pub fn extract<H: crate::Harness>(bus: &H, start: u16) -> Result<(Op, usize), self::Error> {
-        let code = match Op::try_from([bus.read(start)]) {
+    pub fn extract<H: crate::Harness>(bus: &H, start: bits::u16) -> Result<(Op, usize), self::Error> {
+        let code = match Op::try_from([bus.read(start).0]) {
             Ok(op) => return Ok((op, 1)),
             Err(code) => code,
         };
-        let code = match Op::try_from([code[0], bus.read(start.wrapping_add(1))]) {
+        let code = match Op::try_from([code[0], bus.read(start + Wrapping(1)).0]) {
             Ok(op) => return Ok((op, 2)),
             Err(code) => code,
         };
-        match Op::try_from([code[0], code[1], bus.read(start.wrapping_add(2))]) {
+        match Op::try_from([code[0], code[1], bus.read(start + Wrapping(2)).0]) {
             Ok(op) => Ok((op, 3)),
             Err(code) => Err(Error::InvalidTriple(code))
         }

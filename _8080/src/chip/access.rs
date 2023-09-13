@@ -1,6 +1,5 @@
 use core::{ops::{Shl, ShlAssign, Index, IndexMut, DerefMut}, mem};
-
-use crate::{State, Machine, Harness};
+use crate::{State, Machine, Harness, Wrapping, bits};
 
 #[cfg(target_endian="little")]
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -49,7 +48,7 @@ use self::{Register as R, Double as D, Internal as I, Word as W};
 pub enum Byte {
     Single(Register),
     Indirect,
-    RAM(u16),
+    RAM(bits::u16),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -63,7 +62,7 @@ pub enum Internal {
 pub enum Word {
     OnBoard(Internal),
     ProgramStatus,
-    RAM(u16),
+    RAM(bits::u16),
     Stack,
     Indirect,
 }
@@ -92,7 +91,8 @@ impl State {
         self.update_flags_for(self[Register::A])
     }
     #[must_use]
-    fn update_flags_for(&mut self, value: u8) -> &mut bool {
+    fn update_flags_for(&mut self, value: bits::u8) -> &mut bool {
+        let value = value.0;
         let mut parity = value;
         for offset in [4, 2, 1] {
             parity ^= parity >> offset;
@@ -103,16 +103,16 @@ impl State {
         self.a = false;
         &mut self.c
     }
-    fn status(&self) -> u16 {
-        u16::from_le_bytes([self[Register::A], self.flags()])
+    fn status(&self) -> bits::u16 {
+        Wrapping(u16::from_le_bytes([self[Register::A].0, self.flags()]))
     }
 
-    fn push(&mut self) -> u16 {
+    fn push(&mut self) -> bits::u16 {
         self.sp -= 2;
         self.sp
     }
 
-    fn pop(&mut self) -> u16 {
+    fn pop(&mut self) -> bits::u16 {
         let address = self.sp;
         self.sp += 2;
         address
@@ -133,7 +133,7 @@ impl State {
 }
 
 impl Index<Register> for State {
-    type Output = u8;
+    type Output = bits::u8;
     fn index(&self, index: Register) -> &Self::Output { &self.register[index as usize] }
 }
 
@@ -142,22 +142,22 @@ impl IndexMut<Register> for State {
 }
 
 impl Index<Double> for State {
-    type Output = u16;
+    type Output = bits::u16;
     fn index(&self, index: Double) -> &Self::Output {
         let index = 2 * index as u8;
-        unsafe{ mem::transmute::<&u8, &Self::Output>(&self.register[index as usize]) }
+        unsafe{ mem::transmute::<&bits::u8, &Self::Output>(&self.register[index as usize]) }
     }
 }
 
 impl IndexMut<Double> for State {
     fn index_mut(&mut self, index: Double) -> &mut Self::Output {
         let index = 2 * index as u8;
-        unsafe{ mem::transmute::<&mut u8, &mut Self::Output>(&mut self.register[index as usize]) }
+        unsafe{ mem::transmute::<&mut bits::u8, &mut Self::Output>(&mut self.register[index as usize]) }
     }
 }
 
 impl Index<Internal> for State {
-    type Output = u16;
+    type Output = bits::u16;
     fn index(&self, index: Internal) -> &Self::Output {
         match index {
             I::Wide(pair) => &self[pair],
@@ -177,19 +177,19 @@ impl IndexMut<Internal> for State {
     }
 }
 
-impl<H: Harness, C: DerefMut<Target = H>> Shl<&Machine<H, C>> for u16 {
-    type Output = u16;
+impl<H: Harness, C: DerefMut<Target = H>> Shl<&Machine<H, C>> for bits::u16 {
+    type Output = bits::u16;
     fn shl(self, host: &Machine<H, C>) -> Self::Output {
         host.board.read_word(self)
     }
 }
 
 impl<H: Harness, C: DerefMut<Target = H>> Shl<&Machine<H, C>> for Word {
-    type Output = u16;
+    type Output = bits::u16;
     fn shl(self, host: &Machine<H, C>) -> Self::Output {
         match self {
             Self::OnBoard(internal) => host.chip[internal],
-            Self::ProgramStatus => u16::from_le_bytes([host.chip.register[6], host.chip.flags()]),
+            Self::ProgramStatus => Wrapping(u16::from_le_bytes([host.chip.register[6].0, host.chip.flags()])),
             Self::RAM(i) => host.board.read_word(i),
             Self::Stack => panic!("Can't pop from stack without mutate access"),
             Self::Indirect => host.board.read_word(host.chip[D::HL]),
@@ -198,7 +198,7 @@ impl<H: Harness, C: DerefMut<Target = H>> Shl<&Machine<H, C>> for Word {
 }
 
 impl<H: Harness, C: DerefMut<Target = H>> Shl<&mut Machine<H, C>> for Word {
-    type Output = u16;
+    type Output = bits::u16;
     fn shl(self, host: &mut Machine<H, C>) -> Self::Output {
         match self {
             Word::Stack => {
@@ -211,21 +211,21 @@ impl<H: Harness, C: DerefMut<Target = H>> Shl<&mut Machine<H, C>> for Word {
     }
 }
 
-impl<H: Harness, C: DerefMut<Target = H>> ShlAssign<(u16, u16)> for Machine<H, C> {
-    fn shl_assign(&mut self, (index, value): (u16, u16)) {
+impl<H: Harness, C: DerefMut<Target = H>> ShlAssign<(bits::u16, bits::u16)> for Machine<H, C> {
+    fn shl_assign(&mut self, (index, value): (bits::u16, bits::u16)) {
         self.board.write_word(value, index);
     }
 }
 
-impl<H: Harness, C: DerefMut<Target = H>> ShlAssign<(Word, u16)> for Machine<H, C> {
-    fn shl_assign(&mut self, (index, value): (Word, u16)) {
+impl<H: Harness, C: DerefMut<Target = H>> ShlAssign<(Word, bits::u16)> for Machine<H, C> {
+    fn shl_assign(&mut self, (index, value): (Word, bits::u16)) {
         match index {
             W::OnBoard(internal) => self.chip[internal] = value,
             W::Indirect => self.board.write_word(value, self.chip[I::Wide(D::HL)]),
             W::RAM(address) => self.board.write_word(value, address),
             W::ProgramStatus => {
-                let [a, f] = value.to_le_bytes();
-                self.chip[R::A] = a;
+                let [a, f] = value.0.to_le_bytes();
+                self.chip[R::A] = Wrapping(a);
                 self.chip.extract_flags(f);
             }
             W::Stack => {
