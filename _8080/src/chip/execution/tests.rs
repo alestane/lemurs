@@ -271,6 +271,12 @@ fn transfer() {
     chip[DE] = Wrapping(0x8349);
     StoreAccumulatorIndirect { register: DE }.execute_on(&mut chip, &mut env).unwrap();
     assert_eq!(env[0x8349], 0xA8);
+    chip[StackPointer] = Wrapping(0x7201);
+    StackPointerFromHilo.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip.sp.0, 0xA856);
+    chip[ProgramCounter] = Wrapping(0x6473);
+    ProgramCounterFromHilo.execute_on(&mut chip, &mut env).unwrap();
+    assert_eq!(chip[ProgramCounter].0, 0xA856);
 }
 
 #[test]

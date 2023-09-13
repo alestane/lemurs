@@ -26,6 +26,7 @@ impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
         };
         if let Some(action) = self.board.did_execute(&self.chip, op)? {
             action.execute_on(&mut self.chip, self.board.deref_mut()).unwrap();
+            if action == Halt { return Ok(None); }
         }
         outcome
 	}
@@ -293,6 +294,10 @@ impl Op {
                 };
                 10
             }
+            ProgramCounterFromHilo => {
+                chip[ProgramCounter] = chip[HL];
+                5
+            }
             Push (source) => {
                 let source = match source {
                     OnBoard(internal) => chip[internal],
@@ -344,6 +349,10 @@ impl Op {
                 chip.c = accumulator & 0x01 != 0;
                 chip[A] = Wrapping(accumulator.rotate_right(1));
                 4
+            }
+            StackPointerFromHilo => {
+                chip[StackPointer] = chip[HL];
+                5
             }
             StoreAccumulator { address } => {
                 bus.write(chip[A], address);

@@ -126,6 +126,10 @@ fn transfer() {
     assert_eq!(op.0, StoreAccumulatorIndirect { register: BC });
     let op = decode(&[0x39]).unwrap();
     assert_eq!(op.0, DoubleAdd { register: StackPointer });
+    let op = decode(&[0xF9]).unwrap();
+    assert_eq!(op.0, StackPointerFromHilo);
+    let op = decode(&[0xE9, 0x13]).unwrap();
+    assert_eq!(op.0, ProgramCounterFromHilo);
 }
 
 #[test]
