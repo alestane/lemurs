@@ -260,7 +260,7 @@ fn io() {
 
 #[test]
 fn all() {
-    for op in 0u8.. {
+    for op in 0u8..=255u8 {
         match decode(&[op, 0x45, 0x3B]) {
             Ok(..) | Err(Error::Unknown(..)) => (),
             Err(err) => panic!("{err:X}"),
