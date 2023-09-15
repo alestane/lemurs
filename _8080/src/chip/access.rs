@@ -1,5 +1,5 @@
 use core::{ops::{Shl, ShlAssign, Index, IndexMut, DerefMut}, mem};
-use crate::{State, Machine, Harness, Wrapping, bits};
+use crate::{chip::State, Machine, Harness, Wrapping, bits};
 
 #[cfg(target_endian="little")]
 #[derive(Debug, Clone, Copy, PartialEq)]

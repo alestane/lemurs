@@ -41,6 +41,7 @@ mod bits {
 use crate::ops::{Deref, DerefMut, Index, IndexMut, Range, RangeFull, RangeFrom, RangeTo, RangeToInclusive};
 pub use core::result::Result;
 
+#[cfg(debug_assertions)]
 pub use chip::State;
 
 #[cfg(feature="open")]
@@ -51,8 +52,10 @@ pub mod support {
 }
 #[cfg(feature="open")]
 pub mod op {
-    pub use super::chip::opcode::{Op::{self, *}, Flag::*, Test::*};
+    pub use crate::chip::opcode::{Op::{self, *}, Flag::*, Test::*};
 }
+#[cfg(debug_assertions)]
+pub use crate::chip::opcode::Op;
 
 pub trait Harness {
     fn read(&self, from: bits::u16) -> bits::u8;
@@ -68,7 +71,7 @@ pub trait Harness {
 	fn input(&mut self, port: u8) -> bits::u8;
 	fn output(&mut self, port: u8, value: bits::u8);
     #[cfg(debug_assertions)]
-    fn did_execute(&mut self, client: &State, did: op::Op) -> Result<Option<op::Op>, String> { let _ = (client, did); Ok( None ) }
+    fn did_execute(&mut self, client: &State, did: Op) -> Result<Option<Op>, String> { let _ = (client, did); Ok( None ) }
 }
 
 pub struct SimpleBoard {
@@ -165,20 +168,30 @@ impl IndexMut<RangeFull> for SimpleBoard {
 
 pub struct Machine<H: Harness, C: DerefMut<Target = H>> {
     board: C,
-    chip: State,
+    chip: chip::State,
 }
 
 impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
     pub fn new(what: C) -> Self {
-        Self { board: what, chip: State::new() }
+        Self { board: what, chip: chip::State::new() }
     }
 }
 
 impl<H: Harness, C: DerefMut<Target = H>> Deref for Machine<H, C> {
-    type Target = State;
-    fn deref(&self) -> &Self::Target { &self.chip }
+    type Target = H;
+    fn deref(&self) -> &Self::Target { self.board.deref() }
 }
 
 impl<H: Harness, C: DerefMut<Target = H>> DerefMut for Machine<H, C> {
-    fn deref_mut(&mut self) -> &mut Self::Target { &mut self.chip }
+    fn deref_mut(&mut self) -> &mut Self::Target { self.board.deref_mut() }
+}
+
+#[cfg(debug_assertions)]
+impl<H: Harness, C: DerefMut<Target = H>> AsRef<State> for Machine<H, C> {
+    fn as_ref(&self) -> &State { &self.chip }
+}
+
+#[cfg(debug_assertions)]
+impl<H: Harness, C: DerefMut<Target = H>> AsMut<State> for Machine<H, C> {
+    fn as_mut(&mut self) -> &mut State { &mut self.chip }
 }

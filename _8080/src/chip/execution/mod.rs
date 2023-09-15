@@ -17,7 +17,7 @@ impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
 	pub fn execute(&mut self) -> OpOutcome {
 		if !self.chip.active { return Ok(NonZeroU8::new(1)) };
         let (op, len) = Op::extract(self.board.deref_mut(), self.chip.pc)
-            .map_err(|e| panic!("Couldn't extract opcode from {e:X} at {:#06X}", self.pc)).unwrap();
+            .map_err(|e| panic!("Couldn't extract opcode from {e:X} at {:#06X}", self.chip.pc)).unwrap();
         self.chip.pc += len as raw::u16; 
         let outcome = op.execute_on(&mut self.chip, self.board.deref_mut());
         match outcome {
@@ -33,20 +33,20 @@ impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
 
     #[cfg(not(debug_assertions))]
 	pub fn execute(&mut self) -> OpOutcome {
-		if !self.active { return NonZeroU8::new(1) };
-        let (op, len) = Op::extract(self.board.deref(), self.pc)
+		if !self.chip.active { return NonZeroU8::new(1) };
+        let (op, len) = Op::extract(self.board.deref(), self.chip.pc)
             .map_err(|e| panic!("Couldn't extract opcode from {e:X?}")).unwrap();
-        self.pc += len as raw::u16; 
+        self.chip.pc += len as raw::u16; 
         let elapsed = op.execute_on(&mut self.chip, self.board.deref_mut());
-        if elapsed.is_none() { self. active = false; }
+        if elapsed.is_none() { self.chip.active = false; }
         elapsed
 	}
 
     pub fn interrupt(&mut self, op: Op) -> Result<bool, opcode::Error> {
         if op.len() == 1 {
-            Ok(self.interrupts && { 
-                self.active = true; 
-                self.interrupts = false; 
+            Ok(self.chip.interrupts && { 
+                self.chip.active = true; 
+                self.chip.interrupts = false; 
                 let _ = op.execute_on(&mut self.chip, self.board.deref_mut()); 
                 true 
             })
