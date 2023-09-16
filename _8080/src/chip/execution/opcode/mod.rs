@@ -241,6 +241,7 @@ mod b111_0_1111 {
     const StoreAccumulatorIndirect: u8  = 0b000_0_0010;
 }
 
+#[derive(Debug)]
 pub struct OutOfRange;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Error {
@@ -252,6 +253,22 @@ pub enum Error {
     InvalidTriple([u8;3]),
     NoData,
 }
+
+impl core::fmt::Display for OutOfRange {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "value out of bounds")
+    }
+}
+
+impl core::error::Error for OutOfRange {}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl core::error::Error for self::Error {}
 
 impl UpperHex for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

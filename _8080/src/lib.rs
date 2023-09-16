@@ -4,6 +4,7 @@
 #![feature(trait_alias)]
 #![feature(iter_intersperse)]
 #![feature(generic_arg_infer)]
+#![feature(error_in_core)]
 
 #[macro_use]
 extern crate disclose;
