@@ -6,9 +6,9 @@ use core::cell::UnsafeCell;
 
 use crate::{Harness, ops::{Deref, DerefMut, Index, IndexMut}, Machine, raw, bits::*, num::Wrapping};
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(any(feature="open", debug_assertions)))]
 pub(self) mod access;
-#[cfg(debug_assertions)]
+#[cfg(any(feature="open", debug_assertions))]
 pub mod access;
 mod execution;
 
