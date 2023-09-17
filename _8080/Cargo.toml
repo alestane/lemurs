@@ -1,8 +1,11 @@
 [package]
-name = "_8080"
-version = "0.1.0"
+name = "lemurs-8080"
+version = "0.3.0"
 edition = "2021"
-
+authors = ["Nevin Flanagan"]
+description = "A minimal crate to support using no_std Rust libraries in C++ "
+readme = "README.md"
+license = "UPL-1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]

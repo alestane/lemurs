@@ -11,7 +11,7 @@ crate-type = ["staticlib"]
 
 [dependencies]
 cruppers = { version = "0.4", default-features = false, optional = true }
-_8080 = { path = "..", default-features = false }
+lemurs-8080 = { version = ">= 0.3", path = "..", default-features = false }
 
 [features]
 default = ["cpp_panic", "cpp_alloc"]
