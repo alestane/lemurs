@@ -6,7 +6,7 @@ authors = ["Nevin Flanagan"]
 description = "A minimal crate to support using no_std Rust libraries in C++ "
 readme = "README.md"
 license = "UPL-1.0"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+exclude = ["cpp8080/*"]
 
 [lib]
 crate-type = ["rlib"]
