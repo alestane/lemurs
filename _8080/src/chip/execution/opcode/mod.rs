@@ -70,6 +70,16 @@ impl From<u8> for Internal {
     }
 }
 
+impl From<Word> for u8 {
+    fn from(value: Word) -> Self {
+        match value {
+            Word::ProgramStatus | OnBoard(StackPointer) => 3,
+            OnBoard(Wide(pair)) => pair as u8,
+            word => panic!("No bit encoding for location {word:?} in op."),
+        }
+    }
+}
+
 impl From<u8> for Byte {
     fn from(value: u8) -> Self {
         match value & 0b00_111_000 {
@@ -82,6 +92,20 @@ impl From<u8> for Byte {
             0b00_110_000 => Byte::Indirect,
             0b00_111_000 => Single(A),
             _ => unreachable!(),
+        }
+    }
+}
+
+impl From<Byte> for u8 {
+    fn from(value: Byte) -> Self {
+        match value {
+            Byte::Indirect => 6,
+            Single(A) => 7,
+            #[cfg(target_endian="little")]
+            Single(reg) => reg as u8,
+            #[cfg(target_endian="big")]
+            Single(reg) => reg as u8 ^ 0x01,
+            Byte::RAM(_) => panic!("No encoding for direct RAM references"),
         }
     }
 }
