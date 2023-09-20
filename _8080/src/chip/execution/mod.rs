@@ -77,7 +77,7 @@ fn subtract(base: u8, by: u8) -> (u8, bool, bool) {
 
 macro_rules! byte {
     {$chip:expr, $from:ident, $bus:expr, $onboard: expr, $external: expr} => {
-        match $chip.resolve_byte($from) {
+        match $chip.resolve($from) {
             Single(register) => ($chip[register], $onboard),
             Byte::RAM(address) => ($bus.read(address), $external),
             _ => unreachable!()
@@ -165,7 +165,7 @@ impl Op {
                 4
             }
             DecrementByte { register } => {
-                let (value, time) = match chip.resolve_byte(register) {
+                let (value, time) = match chip.resolve(register) {
                     Single(reg) => { chip[reg] -= 1; (chip[reg], 5)}
                     Byte::RAM(address) => { 
                         let value = bus.read(address) - Wrapping(1); 
@@ -216,7 +216,7 @@ impl Op {
                 10
             }
             IncrementByte { register } => {
-                let (value, time) = match chip.resolve_byte(register) {
+                let (value, time) = match chip.resolve(register) {
                     Single(reg) => { chip[reg] += 1; (chip[reg], 5)}
                     Byte::RAM(address) => { 
                         let value = bus.read(address) + Wrapping(1); 
@@ -262,7 +262,7 @@ impl Op {
                 16
             }
             Move{to, from} => {
-                let (to, from) = (chip.resolve_byte(to), chip.resolve_byte(from));
+                let (to, from) = (chip.resolve(to), chip.resolve(from));
                 match (to, from) {
                     (Single(to), Single(from)) => {
                         chip[to] = chip[from];
@@ -280,7 +280,7 @@ impl Op {
                 }
             }
             MoveData { value, to } => {
-                match chip.resolve_byte(to) {
+                match chip.resolve(to) {
                     Single(register) => { chip[register] = value; 7 },
                     Byte::RAM(address) => { bus.write(address, value); 10},
                     _ => unreachable!()

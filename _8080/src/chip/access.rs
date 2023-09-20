@@ -64,7 +64,6 @@ pub enum Word {
     ProgramStatus,
     RAM(bits::u16),
     Stack,
-    Indirect,
 }
 
 #[disclose(super)]
@@ -118,15 +117,9 @@ impl State {
         address
     }
 
-    fn resolve_byte(&self, target: Byte) -> Byte {
+    fn resolve(&self, target: Byte) -> Byte {
         match target {
             Byte::Indirect => Byte::RAM(self[D::HL]),
-            _ => target
-        }
-    }
-    fn resolve_word(&self, target: Word) -> Word {
-        match target {
-            Word::Indirect => Word::RAM(self[D::HL]),
             _ => target
         }
     }
@@ -192,7 +185,6 @@ impl<H: Harness, C: DerefMut<Target = H>> Shl<&Machine<H, C>> for Word {
             Self::ProgramStatus => Wrapping(u16::from_le_bytes([host.chip.register[6].0, host.chip.flags()])),
             Self::RAM(i) => host.board.read_word(i),
             Self::Stack => panic!("Can't pop from stack without mutate access"),
-            Self::Indirect => host.board.read_word(host.chip[D::HL]),
         }
     }
 }
@@ -221,7 +213,6 @@ impl<H: Harness, C: DerefMut<Target = H>> ShlAssign<(Word, bits::u16)> for Machi
     fn shl_assign(&mut self, (index, value): (Word, bits::u16)) {
         match index {
             W::OnBoard(internal) => self.chip[internal] = value,
-            W::Indirect => self.board.write_word(self.chip[I::Wide(D::HL)], value),
             W::RAM(address) => self.board.write_word(address, value),
             W::ProgramStatus => {
                 let [a, f] = value.0.to_le_bytes();
