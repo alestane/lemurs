@@ -11,6 +11,8 @@ fn compile<F : FnOnce(&mut Build)> (file: PathBuf, process: Option<F>) -> Result
 			.cpp(true)
 			.file(file.clone())
 	    	.include("include");
+		#[cfg(debug_assertions)]
+		job.define("DEBUG", "true");
 		if let Some(process) = process {
 			process(&mut job);
 		}

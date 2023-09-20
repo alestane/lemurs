@@ -12,19 +12,22 @@ extern crate disclose;
 #[cfg(feature="std")]
 mod foundation {
     extern crate std;
-    pub use std::{boxed, vec, array, convert, num, string, result, ops, slice};
+    pub use std::{boxed, vec, array, convert, num, string, result, ops, slice, any};
 }
 #[cfg(not(feature="std"))]
 mod foundation {
     extern crate alloc;
     pub use alloc::{boxed, vec, string};
-    pub use core::{array, convert, num, result, ops, slice};
+    pub use core::{array, convert, num, result, ops, slice, any};
 }
 pub use foundation::{string::String, num::Wrapping};
 use foundation::*;
 pub use boxed::Box;
 
 mod chip;
+
+#[cfg(feature="_cpp")]
+mod cpp;
 
 #[allow(non_camel_case_types)]
 mod raw {
@@ -73,8 +76,10 @@ pub trait Harness {
 	fn output(&mut self, port: u8, value: bits::u8);
     #[cfg(debug_assertions)]
     fn did_execute(&mut self, client: &State, did: Op) -> Result<Option<Op>, String> { let _ = (client, did); Ok( None ) }
+    fn as_any(&self) -> Option<&dyn any::Any> { None }
 }
 
+#[repr(C)]
 pub struct SimpleBoard {
 	ram: [u8; 65536],
 	port_out: [u8; 256],
@@ -111,6 +116,9 @@ impl Harness for SimpleBoard {
 	fn output(&mut self, port: u8, value: bits::u8) {
 		self.port_out[port as usize] = value.0
 	}
+    fn as_any(&self) -> Option<&dyn any::Any> {
+        Some(self)
+    }
 }
 
 impl Index<u16> for SimpleBoard {
@@ -167,32 +175,32 @@ impl IndexMut<RangeFull> for SimpleBoard {
     fn index_mut(&mut self, _index: RangeFull) -> &mut Self::Output { &mut self.ram[..] }
 }
 
-pub struct Machine<H: Harness, C: DerefMut<Target = H>> {
+pub struct Machine<H: Harness + ?Sized, C: DerefMut<Target = H>> {
     board: C,
     chip: chip::State,
 }
 
-impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
+impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Machine<H, C> {
     pub fn new(what: C) -> Self {
         Self { board: what, chip: chip::State::new() }
     }
 }
 
-impl<H: Harness, C: DerefMut<Target = H>> Deref for Machine<H, C> {
+impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Deref for Machine<H, C> {
     type Target = H;
     fn deref(&self) -> &Self::Target { self.board.deref() }
 }
 
-impl<H: Harness, C: DerefMut<Target = H>> DerefMut for Machine<H, C> {
+impl<H: Harness + ?Sized, C: DerefMut<Target = H>> DerefMut for Machine<H, C> {
     fn deref_mut(&mut self) -> &mut Self::Target { self.board.deref_mut() }
 }
 
 #[cfg(debug_assertions)]
-impl<H: Harness, C: DerefMut<Target = H>> AsRef<State> for Machine<H, C> {
+impl<H: Harness + ?Sized, C: DerefMut<Target = H>> AsRef<State> for Machine<H, C> {
     fn as_ref(&self) -> &State { &self.chip }
 }
 
 #[cfg(debug_assertions)]
-impl<H: Harness, C: DerefMut<Target = H>> AsMut<State> for Machine<H, C> {
+impl<H: Harness + ?Sized, C: DerefMut<Target = H>> AsMut<State> for Machine<H, C> {
     fn as_mut(&mut self) -> &mut State { &mut self.chip }
 }

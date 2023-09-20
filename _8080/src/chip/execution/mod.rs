@@ -12,11 +12,16 @@ pub(super) type OpOutcome = Result<Option<NonZeroU8>, Failure>;
 #[cfg(not(debug_assertions))]
 pub(super) type OpOutcome = Option<NonZeroU8>;
 
-impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
+impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Machine<H, C> {
+    fn from_pc(&self) -> impl Iterator<Item=raw::u8> + '_ {
+        let mut start = self.chip.pc;
+        core::iter::from_fn(move || {let val = self.board.read(start).0; start += 1; Some(val)})
+    }
+
     #[cfg(debug_assertions)]
 	pub fn execute(&mut self) -> OpOutcome {
 		if !self.chip.active { return Ok(NonZeroU8::new(1)) };
-        let (op, len) = Op::extract(self.board.deref_mut(), self.chip.pc)
+        let (op, len) = Op::extract(self.from_pc())
             .map_err(|e| panic!("Couldn't extract opcode from {e:X} at {:#06X}", self.chip.pc)).unwrap();
         self.chip.pc += len as raw::u16; 
         let outcome = op.execute_on(&mut self.chip, self.board.deref_mut());
@@ -34,7 +39,7 @@ impl<H: Harness, C: DerefMut<Target = H>> Machine<H, C> {
     #[cfg(not(debug_assertions))]
 	pub fn execute(&mut self) -> OpOutcome {
 		if !self.chip.active { return NonZeroU8::new(1) };
-        let (op, len) = Op::extract(self.board.deref(), self.chip.pc)
+        let (op, len) = Op::extract(self.from_pc())
             .map_err(|e| panic!("Couldn't extract opcode from {e:X?}")).unwrap();
         self.chip.pc += len as raw::u16; 
         let elapsed = op.execute_on(&mut self.chip, self.board.deref_mut());
@@ -82,7 +87,7 @@ macro_rules! byte {
 
 impl Op {
     #[cfg_attr(debug_assertions, allow(unreachable_patterns))]
-    fn execute_on<H: Harness>(self, chip: &mut State, mut bus: impl DerefMut<Target = H>) -> OpOutcome {
+    fn execute_on<H: Harness + ?Sized>(self, chip: &mut State, mut bus: impl DerefMut<Target = H>) -> OpOutcome {
         let cycles = match self {
             Add { from, carry } => {
                 let (value, time) = byte!{chip, from, bus, 4, 7};

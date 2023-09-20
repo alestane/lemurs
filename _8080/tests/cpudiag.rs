@@ -1,7 +1,6 @@
 #![feature(generic_arg_infer)]
 
-extern crate _8080;
-use _8080::Machine;
+use lemurs_8080::Machine;
 
 mod src {
     pub mod cp_m;

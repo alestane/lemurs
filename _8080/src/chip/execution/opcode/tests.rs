@@ -1,27 +1,7 @@
 use super::*;    
     
 fn decode(value: &[u8]) -> crate::Result<(Op, usize), self::Error> {
-    if value.len() < 1 { return Err(self::Error::NoData); }
-    let code = match Op::try_from([value[0]]) {
-        Ok(op) => return Ok( (op, 1) ),
-        Err(code) => code,
-    };
-    match code[0] {
-        0xCB | 0xD9 => return Err(Error::Unknown(code[0])),
-        0xDD | 0xED | 0xFD => return Err(Error::Unknown(code[0])),
-        nop if nop & 0b11_000_111 == 0 => return Err(Error::Unknown(nop)),
-        _ => ()
-    };
-if value.len() < 2 { return Err(self::Error::Invalid(code)); }
-    let code = match Op::try_from([code[0], value[1]]) {
-        Ok(op) => return Ok( (op, 2) ),
-        Err(code) => code,
-    };
-    if value.len() < 3 { return Err(Error::InvalidPair(code)); }
-    match Op::try_from([code[0], code[1], value[2]]) {
-        Ok(op) => Ok( (op, 3) ),
-        Err(code) => Err(self::Error::InvalidTriple(code))
-    } 
+    Op::extract(value.iter().copied())
 }
 
 #[test]

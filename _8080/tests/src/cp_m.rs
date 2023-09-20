@@ -1,6 +1,4 @@
-extern crate _8080;
-
-use _8080::{Harness, support::*, op};
+use lemurs_8080::{Harness, support::*, op};
 use core::{ops::{Deref, Index, IndexMut}, num::Wrapping};
 use std::collections::HashSet;
 
@@ -56,6 +54,7 @@ impl Harness for CP_M {
     fn input(&mut self, port: u8) -> Wrapping<u8> { Wrapping(self.port[port as usize]) }
     fn output(&mut self, port: u8, value: Wrapping<u8>) { self.port[port as usize] = value.0; }
     fn did_execute(&mut self, client: &_8080::State, _did: op::Op) -> Result<Option<op::Op>, String> {
+        use _8080::support::{Double, Register};
         self.order.push(client.pc);
         if client.pc.0 >= 0x01AB && self.history.contains(&client.pc) {
             eprintln!("\n{:?}", self.order);
@@ -63,7 +62,7 @@ impl Harness for CP_M {
         } else {
             self.history.insert(client.pc);
         }
-                match client.pc.0 {
+        match client.pc.0 {
             0 => {
                 print!("\n");
                 return (self.dead == 0).then_some(Some(op::Halt)).ok_or(String::from("Failed tests"));

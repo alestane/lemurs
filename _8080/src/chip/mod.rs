@@ -48,7 +48,7 @@ impl Harness for Socket {
 	fn input(&mut self, _port: raw::u8) -> u8 { Wrapping(0) }
 	fn output(&mut self, _port: raw::u8, _value: u8) { }
 }
-
+#[repr(C)]
 #[cfg_attr(debug_assertions, disclose)]
 pub struct State {
 	pc: u16,
@@ -72,7 +72,7 @@ impl State {
 }
 
 #[cfg(debug_assertions)]
-impl<H: Harness, C: DerefMut<Target = H>> Iterator for Machine<H, C> {
+impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Iterator for Machine<H, C> {
 	type Item = Result<core::primitive::u8, crate::String>;	
 	fn next(&mut self) -> Option<Self::Item> {
 		let result = self.execute();
@@ -85,7 +85,7 @@ impl<H: Harness, C: DerefMut<Target = H>> Iterator for Machine<H, C> {
 }
 
 #[cfg(not(debug_assertions))]
-impl<H: Harness, C: DerefMut<Target = H>> Iterator for Machine<H, C> {
+impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Iterator for Machine<H, C> {
 	type Item = core::primitive::u8;
 	fn next(&mut self) -> Option<Self::Item> {
 		use core::num::NonZeroU8;

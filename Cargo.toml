@@ -1,4 +1,4 @@
 [workspace]
-members = ["_8080", "_8080/cpp8080"]
+members = ["_8080"]
 resolver = "2"
 default-members = ["_8080"]

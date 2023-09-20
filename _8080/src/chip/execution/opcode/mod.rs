@@ -426,8 +426,9 @@ impl Op {
         }
     }
 
-    pub fn extract<H: crate::Harness>(bus: &H, start: bits::u16) -> Result<(Op, usize), self::Error> {
-        let code = match Op::try_from([bus.read(start).0]) {
+    pub fn extract(feed: impl IntoIterator<Item = u8>) -> Result<(Op, usize), self::Error> {
+        let mut feed = feed.into_iter();
+        let code = match Op::try_from([feed.next().ok_or(Error::NoData)?]) {
             Ok(op) => return Ok((op, 1)),
             Err(code) => code,
         };
@@ -437,11 +438,11 @@ impl Op {
             nop if nop & 0b11_000_111 == 0 => return Err(Error::Unknown(nop)),
             _ => ()
         };
-        let code = match Op::try_from([code[0], bus.read(start + Wrapping(1)).0]) {
+        let code = match Op::try_from([code[0], feed.next().ok_or(Error::Invalid(code))?]) {
             Ok(op) => return Ok((op, 2)),
             Err(code) => code,
         };
-        match Op::try_from([code[0], code[1], bus.read(start + Wrapping(2)).0]) {
+        match Op::try_from([code[0], code[1], feed.next().ok_or(Error::InvalidPair(code))?]) {
             Ok(op) => Ok((op, 3)),
             Err(code) => Err(Error::InvalidTriple(code))
         }
