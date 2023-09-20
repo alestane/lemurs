@@ -213,7 +213,7 @@ impl<H: Harness, C: DerefMut<Target = H>> Shl<&mut Machine<H, C>> for Word {
 
 impl<H: Harness, C: DerefMut<Target = H>> ShlAssign<(bits::u16, bits::u16)> for Machine<H, C> {
     fn shl_assign(&mut self, (index, value): (bits::u16, bits::u16)) {
-        self.board.write_word(value, index);
+        self.board.write_word(index, value);
     }
 }
 
@@ -221,8 +221,8 @@ impl<H: Harness, C: DerefMut<Target = H>> ShlAssign<(Word, bits::u16)> for Machi
     fn shl_assign(&mut self, (index, value): (Word, bits::u16)) {
         match index {
             W::OnBoard(internal) => self.chip[internal] = value,
-            W::Indirect => self.board.write_word(value, self.chip[I::Wide(D::HL)]),
-            W::RAM(address) => self.board.write_word(value, address),
+            W::Indirect => self.board.write_word(self.chip[I::Wide(D::HL)], value),
+            W::RAM(address) => self.board.write_word(address, value),
             W::ProgramStatus => {
                 let [a, f] = value.0.to_le_bytes();
                 self.chip[R::A] = Wrapping(a);
@@ -230,7 +230,7 @@ impl<H: Harness, C: DerefMut<Target = H>> ShlAssign<(Word, bits::u16)> for Machi
             }
             W::Stack => {
                 self.chip.sp -= 2;
-                self.board.write_word(value, self.chip.sp);
+                self.board.write_word(self.chip.sp, value);
             }
         }
     }

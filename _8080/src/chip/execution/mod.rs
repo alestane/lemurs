@@ -116,7 +116,7 @@ impl Op {
                 7
             }
             Call{sub} => {
-                bus.write_word(chip.pc, chip.push());
+                bus.write_word(chip.push(), chip.pc);
                 chip.pc = sub;
                 17
             }
@@ -169,7 +169,7 @@ impl Op {
                     Single(reg) => { chip[reg] -= 1; (chip[reg], 5)}
                     Byte::RAM(address) => { 
                         let value = bus.read(address) - Wrapping(1); 
-                        bus.write(value, address);
+                        bus.write(address, value);
                         (value, 10)
                     }
                     _ => unreachable!()
@@ -194,7 +194,7 @@ impl Op {
             ExchangeTopWithHilo => {
                 let out = chip[HL];
                 chip[HL] = bus.read_word(chip.sp);
-                bus.write_word(out, chip.sp);
+                bus.write_word(chip.sp, out);
                 18
             }
             ExclusiveOr { from } => {
@@ -220,7 +220,7 @@ impl Op {
                     Single(reg) => { chip[reg] += 1; (chip[reg], 5)}
                     Byte::RAM(address) => { 
                         let value = bus.read(address) + Wrapping(1); 
-                        bus.write(value, address);
+                        bus.write(address, value);
                         (value, 10)
                     }
                     _ => unreachable!()
@@ -269,7 +269,7 @@ impl Op {
                         5
                     }
                     (Byte::RAM(address), Single(from)) => {
-                        bus.write(chip[from], address);
+                        bus.write(address, chip[from]);
                         7
                     }
                     (Single(to), Byte::RAM(address)) => {
@@ -282,7 +282,7 @@ impl Op {
             MoveData { value, to } => {
                 match chip.resolve_byte(to) {
                     Single(register) => { chip[register] = value; 7 },
-                    Byte::RAM(address) => { bus.write(value, address); 10},
+                    Byte::RAM(address) => { bus.write(address, value); 10},
                     _ => unreachable!()
                 }
             }
@@ -322,11 +322,11 @@ impl Op {
                     ProgramStatus => chip.status(),
                     _ => unreachable!()
                 };
-                bus.write_word(source, chip.push());
+                bus.write_word(chip.push(), source);
                 11
             }
             Reset{vector} => {
-                bus.write_word(chip.pc, chip.push());
+                bus.write_word(chip.push(), chip.pc);
                 chip.pc = Wrapping(vector as raw::u16 * 8);
                 11
             }
@@ -373,15 +373,15 @@ impl Op {
                 5
             }
             StoreAccumulator { address } => {
-                bus.write(chip[A], address);
+                bus.write(address, chip[A]);
                 13
             }
             StoreAccumulatorIndirect { register } => {
-                bus.write(chip[A], chip[register]);
+                bus.write(chip[register], chip[A]);
                 7
             }
             StoreHilo{ address } => {
-                bus.write_word(chip[HL], address);
+                bus.write_word(address, chip[HL]);
                 16
             }
             Subtract { from, carry } => {

@@ -98,10 +98,10 @@ impl crate::Harness for Harness {
     fn read_word(&self, from: Wrapping<u16>) -> Wrapping<u16> {
         unsafe { read_word_harness(self, from) }
     }
-    fn write(&mut self, value: Wrapping<u8>, to: Wrapping<u16>) {
+    fn write(&mut self, to: Wrapping<u16>, value: Wrapping<u8>) {
         unsafe { write_harness(self, to, value) }
     }
-    fn write_word(&mut self, value: Wrapping<u16>, to: Wrapping<u16>) {
+    fn write_word(&mut self, to: Wrapping<u16>, value: Wrapping<u16>) {
         unsafe { write_word_harness(self, to, value) }
     }
     fn input(&mut self, port: u8) -> Wrapping<u8> {

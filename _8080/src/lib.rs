@@ -66,10 +66,10 @@ pub trait Harness {
     fn read_word(&self, from: bits::u16) -> bits::u16 {
         Wrapping(u16::from_le_bytes([self.read(from).0, self.read(from + Wrapping(1)).0]))
     }
-    fn write(&mut self, value: bits::u8, to: bits::u16) { let _ = (value, to); }
-    fn write_word(&mut self, value: bits::u16, to: bits::u16) {
+    fn write(&mut self, to: bits::u16, value: bits::u8) { let _ = (value, to); }
+    fn write_word(&mut self, to: bits::u16, value: bits::u16) {
         for (index, byte) in value.0.to_le_bytes().into_iter().enumerate() {
-            self.write(num::Wrapping(byte), to + num::Wrapping(index as u16))
+            self.write(to + num::Wrapping(index as u16), num::Wrapping(byte))
         }
     }
 	fn input(&mut self, port: u8) -> bits::u8;
@@ -106,8 +106,8 @@ impl Harness for SimpleBoard {
     fn read_word(&self, from: bits::u16) -> bits::u16 {
         Wrapping(u16::from_le_bytes([self.ram[from.0 as usize], self.ram[from.0 as usize + 1]]))
     }
-    fn write(&mut self, value: bits::u8, to: bits::u16) { self.ram[to.0 as usize] = value.0; }
-    fn write_word(&mut self, value: bits::u16, to: bits::u16) {
+    fn write(&mut self, to: bits::u16, value: bits::u8) { self.ram[to.0 as usize] = value.0; }
+    fn write_word(&mut self, to: bits::u16, value: bits::u16) {
         [self.ram[to.0 as usize], self.ram[to.0.wrapping_add(1) as usize]] = value.0.to_le_bytes();
     }
 	fn input(&mut self, port: u8) -> bits::u8 {
