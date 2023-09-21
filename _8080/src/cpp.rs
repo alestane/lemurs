@@ -111,10 +111,10 @@ impl crate::Harness for Harness {
         unsafe { output_harness(self, port, value) }
     }
     #[cfg(debug_assertions)]
-    fn did_execute(&mut self, client: &crate::State, _did: crate::Op) -> Result<Option<crate::Op>, crate::String> {
+    fn did_execute(&mut self, client: &crate::State, did: crate::Op) -> Result<Option<crate::Op>, crate::String> {
         use core::{mem::transmute, ffi::CStr};
         unsafe {
-            match did_execute_harness(self, client, u32::from_be_bytes([0;4])) {
+            match did_execute_harness(self, client, u32::from_be_bytes(did.into())) {
                 None => Ok(None),
                 Some(code@&[0, ..]) => Ok(Some(crate::Op::extract(code[1..].iter().copied()).or(Err(crate::String::from("Not a valid opcode")))?.0)),
                 Some(bytes) => Err(CStr::from_ptr(transmute(bytes)).to_string_lossy().into_owned()),
