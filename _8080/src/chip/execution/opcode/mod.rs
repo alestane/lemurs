@@ -167,6 +167,21 @@ impl From<u8> for Test {
     }
 }
 
+impl From<Test> for u8 {
+    fn from(value: Test) -> Self {
+        match value {
+            Not(Zero) => 0b00_00_0_000,
+            Is(Zero)  => 0b00_00_1_000,
+            Not(Carry) => 0b00_01_0_000,
+            Is(Carry)  => 0b00_01_1_000,
+            Not(EvenParity) => 0b00_10_0_000,
+            Is(EvenParity)  => 0b00_10_1_000,
+            Not(Negative) => 0b00_11_0_000,
+            Is(Negative)  => 0b00_11_1_000,
+        }
+    }
+}
+
 #[disclose]
 #[allow(non_upper_case_globals)]
 mod b11111111 {
@@ -207,7 +222,7 @@ mod b11111111 {
     const AddImmediateCarrying: u8  = 0b11001110;
     const SubtractImmediate: u8     = 0b11010110;
     const SubtractImmediateBorrowing: u8    = 0b11011110;
-    const ExclusiveOr: u8   = 0b11101110;
+    const ExclusiveOrImmediate: u8  = 0b11101110;
     const OrImmediate: u8   = 0b11110110;
     const CompareImmediate: u8   = 0b11111110;
 
@@ -389,7 +404,7 @@ impl TryFrom<[u8;2]> for Op {
             b11111111::SubtractImmediate => return Ok(SubtractBy{ value, carry: false }),
             b11111111::SubtractImmediateBorrowing => return Ok(SubtractBy { value, carry: true }),
             b11111111::AndImmediate => return Ok(AndWith { value }),
-            b11111111::ExclusiveOr => return Ok(ExclusiveOrWith{value}),
+            b11111111::ExclusiveOrImmediate => return Ok(ExclusiveOrWith{value}),
             b11111111::OrImmediate => return Ok(OrWith{value}),
             b11111111::CompareImmediate => return Ok(CompareWith{ value }),
             b11111111::Output => return Ok(Out(code[1])),
@@ -469,6 +484,90 @@ impl Op {
         match Op::try_from([code[0], code[1], feed.next().ok_or(Error::InvalidPair(code))?]) {
             Ok(op) => Ok((op, 3)),
             Err(code) => Err(Error::InvalidTriple(code))
+        }
+    }
+}
+
+impl Into<[u8;4]> for Op {
+    fn into(self) -> [u8;4] {
+        match self {
+            NOP(..) => [ 1, 0, 0, 0 ],
+            Add{ from, .. } | Subtract { from, .. } | And { from } | 
+            ExclusiveOr { from } | Or { from } | Compare { from }
+                => {
+                    let op = match self {
+                        Add{ carry: false, ..} => b11_111_000::AddToAccumulator,
+                        Add{ carry: true, ..}  => b11_111_000::AddCarryingToAccumulator,
+                        Subtract { carry: false, .. } => b11_111_000::SubtractFromAccumulator,
+                        Subtract { carry: true, .. }  => b11_111_000::SubtractBorrowingFromAccumulator,
+                        And { .. } => b11_111_000::AndWithAccumulator,
+                        ExclusiveOr { .. } => b11_111_000::ExclusiveOrWithAccumulator,
+                        Or { .. } => b11_111_000::OrWithAccumulator,
+                        Compare { .. } => b11_111_000::CompareWithAccumulator,
+                        _ => unreachable!(),
+                    };
+                    [ 1, 0, 0, op | u8::from(from) ]
+                }
+            AddTo { value, .. } | SubtractBy { value, .. } | AndWith { value } |
+            ExclusiveOrWith { value } | OrWith { value } | CompareWith { value }
+                => {
+                    let op = match self {
+                        AddTo { carry: false, .. } => b11111111::AddImmediate,
+                        AddTo { carry: true, .. } => b11111111::AddImmediateCarrying,
+                        SubtractBy { carry: false, .. } => b11111111::SubtractImmediate,
+                        SubtractBy { carry: true, .. } => b11111111::SubtractImmediateBorrowing,
+                        AndWith { .. } => b11111111::AndImmediate,
+                        ExclusiveOrWith { .. } => b11111111::ExclusiveOrImmediate,
+                        OrWith { .. } => b11111111::OrImmediate,
+                        CompareWith { .. } => b11111111::CompareImmediate,
+                        _ => unreachable!()
+                    };
+                    [2, 0, op, value.0]
+                }
+            Call { sub } => { let address = sub.0.to_le_bytes(); [ 3, b11111111::Call, address[0], address[1] ]}
+            CallIf(test, sub) 
+                => { let address = sub.0.to_le_bytes(); [ 3, b11_000_111::CallIf | (u8::from(test) << 3), address[0], address[1] ]}
+            CarryFlag(set) => [ 1, 0, 0, if set { b11111111::SetCarry } else { b11111111::ComplementCarry } ],
+            ComplementAccumulator => [ 1, 0, 0, b11111111::ComplementAccumulator ],
+            DecimalAddAdjust => [ 1, 0, 0, b11111111::DecimalAddAdjust ],
+            DecrementByte { register } => [ 1, 0, 0, b11_000_111::DecrementRegister | (u8::from(register) << 3) ],
+            DecrementWord { register } => [ 1, 0, 0, b11_00_1111::DecrementExtended | (u8::from(OnBoard(register)) << 4) ],
+            DoubleAdd { register } => [ 1, 0, 0, b11_00_1111::DoubleAdd | (u8::from(OnBoard(register)) << 4) ],
+            ExchangeDoubleWithHilo => [ 1, 0, 0, b11111111::ExchangeDoubleWithHilo ],
+            ExchangeTopWithHilo => [ 1, 0, 0, b11111111::ExchangeTopWithHilo ],
+            Halt => [ 1, 0, 0, b11111111::Halt ],
+            In(port) => [ 2, 0, b11111111::Input, port ],
+            IncrementByte { register } => [ 1, 0, 0, b11_000_111::IncrementRegister | (u8::from(register)) << 3 ],
+            IncrementWord { register } => [ 1, 0, 0, b11_00_1111::IncrementExtended | (u8::from(OnBoard(register)) << 4) ],
+            Interrupts(accepted) => [ 1, 0, 0, if accepted { b11111111:: EnableInterrupts } else { b11111111::DisableInterrupts } ],
+            Jump { to } => { let bytes = to.0.to_le_bytes(); [ 3, b11111111::Jump, bytes[0], bytes[1] ] }
+            JumpIf(test, to) 
+                => { let bytes = to.0.to_le_bytes(); [ 3, b11_000_111::JumpIf | (u8::from(test) << 4), bytes[0], bytes[1] ]}
+            LoadAccumulator { address } => { let bytes = address.0.to_le_bytes(); [ 3, b11111111::LoadAccumulatorDirect, bytes[0], bytes[1] ] }
+            LoadAccumulatorIndirect { register } => [ 1, 0, 0, b111_0_1111::LoadAccumulatorIndirect | ((u8::from(OnBoard(Wide(register))) & 0x01) << 4) ],
+            LoadExtendedWith { to, value } 
+                => { let bytes = value.0.to_le_bytes(); [ 3, b11_00_1111::LoadExtendedImmediate | (u8::from(OnBoard(to)) << 4), bytes[0], bytes[1] ] }
+            LoadHilo { address } 
+                => { let bytes = address.0.to_le_bytes(); [3, b11111111::LoadHiloDirect, bytes[0], bytes[1] ] }
+            Move { to, from } => [ 1, 0, 0, b11_000000::Move | (u8::from(to) << 3) | u8::from(from) ],
+            MoveData { value, to } => [ 2, 0, b11_000_111::MoveImmediate | (u8::from(to) << 3), value.0 ],
+            Out(port) => [ 2, 0, b11111111::Output, port ],
+            Pop(target) => [ 1, 0, 0, b11_00_1111::Pop | (u8::from(target) << 4) ],
+            ProgramCounterFromHilo => [ 1, 0, 0, b11111111::ProgramCounterFromHilo ], 
+            Push(source) => [ 1, 0, 0, b11_00_1111::Push | (u8::from(source) << 4) ],
+            Reset { vector } => [ 1, 0, 0, b11_000_111::Reset | (vector << 3) ],
+            Return => [ 1, 0, 0, b11111111::Return ],
+            ReturnIf(test) => [ 1, 0, 0, b11_000_111::ReturnIf | (u8::from(test) << 3) ],
+            RotateAccumulatorLeft => [ 1, 0, 0, b11111111::RotateAccumulatorLeft ],
+            RotateAccumulatorRight => [ 1, 0, 0, b11111111::RotateAccumulatorRight ],
+            RotateLeftCarrying => [ 1, 0, 0, b11111111::RotateLeftCarrying ],
+            RotateRightCarrying => [ 1, 0, 0, b11111111::RotateRightCarrying ],
+            StackPointerFromHilo => [ 1, 0, 0, b11111111::StackPointerFromHilo ],
+            StoreAccumulator { address } 
+                => { let bytes = address.0.to_le_bytes(); [ 3, b11111111::StoreAccumulatorDirect, bytes[0], bytes[1] ] }
+            StoreAccumulatorIndirect { register } 
+                => [ 1, 0, 0, b111_0_1111::StoreAccumulatorIndirect | ((u8::from(OnBoard(Wide(register))) & 0b01 ) << 4) ], 
+            StoreHilo { address } => { let bytes = address.0.to_le_bytes(); [ 3, b11111111::StoreHiLoDirect, bytes[0], bytes[1] ] }
         }
     }
 }
