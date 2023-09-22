@@ -66,7 +66,7 @@ impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Machine<H, C> {
             _ => Err(opcode::OutOfRange)
         }
     }
-    }
+}
 
 fn subtract(base: u8, by: u8) -> (u8, bool, bool) {
     let value = (!by) + Wrapping(1);

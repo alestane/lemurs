@@ -76,6 +76,11 @@ extern "C-unwind" fn machine_execute(host: &mut Machine) -> u8 {
 }
 
 #[no_mangle]
+extern "C-unwind" fn machine_interrupt(host:&mut Machine, code: u8) -> bool {
+    unsafe { host.interrupt(crate::chip::opcode::Op::extract(core::iter::once(code)).expect("not a valid interrupt code.").0).unwrap_unchecked() }
+}
+
+#[no_mangle]
 extern "C" fn discard_machine(state: *mut Machine) {
     drop(unsafe{Box::from_raw(state)});
 }

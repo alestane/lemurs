@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <memory>
 #include <vector>
+#include <stdexcept>
 
 namespace i8080 {
 	using byte = uint8_t;
@@ -58,6 +59,12 @@ namespace i8080 {
 		const simple_board* get_default_host() const &;
 
 		uint8_t execute() &;
+		bool interrupt(byte code) &;
+		bool reset(uint8_t vector) & 
+		{ 
+			if (vector >= 8) { throw std::runtime_error{"reset vector out of range."}; } 
+			return interrupt( 0xC7 | vector << 3);
+		}
 	private:
 		machine() = delete;
 		unsigned char : 0;

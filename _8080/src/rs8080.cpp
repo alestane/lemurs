@@ -11,6 +11,7 @@ extern "C" {
 	const i8080::simple_board* request_default_impl(const machine& host);
 
 	byte machine_execute(machine& host);
+	bool machine_interrupt(machine& host, byte code);
 
 	void discard_machine(machine* host);
 }
@@ -68,5 +69,10 @@ namespace i8080 {
 	byte machine::execute() & 
 	{
 		return machine_execute(*this);
+	}
+
+	bool machine::interrupt(byte code) & 
+	{
+		return machine_interrupt(*this, code);
 	}
 }
