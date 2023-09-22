@@ -34,7 +34,7 @@ namespace i8080 {
 		virtual void write_word(word address, word value) { write(address, value & 0xFF); write(address + 1, value >> 8); }
 		virtual byte input(byte port) = 0;
 		virtual void output(byte port, byte value) = 0;
-		#ifdef DEBUG
+		#ifndef NDEBUG
 		virtual const byte* did_execute(const state& chip, byte op[4]) { return nullptr; }
 		#endif
 	};
@@ -67,7 +67,7 @@ namespace i8080 {
 			if (vector >= 8) { throw std::runtime_error{"reset vector out of range."}; } 
 			return interrupt( 0xC7 | vector << 3);
 		}
-		#ifdef DEBUG
+		#ifndef NDEBUG
 		const state& operator*() const;
 		#endif
 	private:

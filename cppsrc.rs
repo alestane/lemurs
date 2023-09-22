@@ -13,6 +13,8 @@ fn compile<F : FnOnce(&mut Build)> (file: PathBuf, process: Option<F>) -> Result
 	    	.include("include");
 		#[cfg(debug_assertions)]
 		job.define("DEBUG", "true");
+		#[cfg(not(debug_assertions))]
+		job.define("NDEBUG", "true");
 		if let Some(process) = process {
 			process(&mut job);
 		}
