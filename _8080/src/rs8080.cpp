@@ -14,6 +14,9 @@ extern "C" {
 	bool machine_interrupt(machine& host, byte code);
 
 	void discard_machine(machine* host);
+#ifdef DEBUG
+	const i8080::state& machine_state(const machine& host);
+#endif
 }
 
 extern "C" byte read_harness(const board& host, word address) 
@@ -75,4 +78,10 @@ namespace i8080 {
 	{
 		return machine_interrupt(*this, code);
 	}
+#ifdef DEBUG
+	const state& machine::operator*() const 
+	{
+		return machine_state(*this);
+	}
+#endif
 }

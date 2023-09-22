@@ -57,6 +57,12 @@ extern "C" fn request_default_impl(host: &Machine) -> Option<&crate::SimpleBoard
 }
 
 #[no_mangle]
+#[cfg(debug_assertions)]
+extern "C" fn machine_state(host: &Machine) -> &crate::State {
+    host.as_ref()
+}
+
+#[no_mangle]
 #[cfg(not(debug_assertions))]
 extern "C-unwind" fn machine_execute(host: &mut Machine) -> u8 {
     match host.execute() {

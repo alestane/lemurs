@@ -16,8 +16,11 @@ namespace i8080 {
 	public:
 		word pc;
 		word sp;
-		byte reg[7];
-		bool c, a, p, m, z;
+		union { byte c, b; word bc; };
+		union { byte e, d; word de; };
+		union { byte l, h; word hl; };
+		byte accumulator;
+		bool carry, aux, parity, minus, zero;
 		bool active, interrupts;
 
 		state() = delete;
@@ -33,7 +36,6 @@ namespace i8080 {
 		virtual void output(byte port, byte value) = 0;
 		#ifdef DEBUG
 		virtual const byte* did_execute(const state& chip, byte op[4]) { return nullptr; }
-
 		#endif
 	};
 
@@ -65,6 +67,9 @@ namespace i8080 {
 			if (vector >= 8) { throw std::runtime_error{"reset vector out of range."}; } 
 			return interrupt( 0xC7 | vector << 3);
 		}
+		#ifdef DEBUG
+		const state& operator*() const;
+		#endif
 	private:
 		machine() = delete;
 		unsigned char : 0;
