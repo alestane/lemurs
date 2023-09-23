@@ -1,3 +1,4 @@
+#define _8080_INTERNALS
 #include "rs8080.h"
 
 using i8080::byte;
@@ -15,9 +16,7 @@ extern "C" {
 
 	void discard_machine(machine* host);
 
-	#ifdef _8080_INTERNALS
 	const i8080::state& machine_state(const machine& host);
-	#endif
 }
 
 extern "C" byte read_harness(const board& host, word address) 
@@ -50,12 +49,10 @@ extern "C" void output_harness(board& host, byte port, byte value)
 	host.output(port, value);
 }
 
-#ifdef _8080_INTERNALS
 extern "C" const byte* did_execute_harness(board& host, const i8080::state& chip, byte op[4])
 {
 	return host.did_execute(chip, op);
 }
-#endif
 
 namespace i8080 {
  	void machine::deleter::operator()(machine* it) const { discard_machine(it); } 
@@ -80,10 +77,8 @@ namespace i8080 {
 		return machine_interrupt(*this, code);
 	}
 
-	#ifdef _8080_INTERNALS
 	const state& machine::operator*() const 
 	{
 		return machine_state(*this);
 	}
-	#endif
 }
