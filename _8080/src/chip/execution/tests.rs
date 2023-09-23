@@ -1,6 +1,39 @@
 use super::*;
-use crate::{chip::*, SimpleBoard};
+use core::cell::UnsafeCell;
+
+use crate::{SimpleBoard, Harness, ops::{Deref, Index, IndexMut}, raw, num::Wrapping};
 use opcode::{Test::*, Flag::*};
+
+pub struct Socket(UnsafeCell<u8>);
+
+impl Default for Socket {
+	fn default() -> Self{
+		Socket(UnsafeCell::default())
+	}
+}
+
+impl Index<u16> for Socket {
+	type Output = u8;
+	fn index(&self, _index: u16) -> &Self::Output { let i = self.0.get(); unsafe {*i = Wrapping(0); &*i} }
+}
+
+impl IndexMut<u16> for Socket {
+	fn index_mut(&mut self, _index: u16) -> &mut Self::Output { let i = self.0.get_mut(); *i = Wrapping(0); i }
+}
+
+impl Deref for Socket {
+	type Target = [u8];
+	fn deref(&self) -> &Self::Target {
+		core::slice::from_ref(unsafe{self.0.get().as_ref().unwrap_unchecked()})
+	}
+}
+
+impl Harness for Socket {
+	fn read(&self, from: u16) -> u8 { let _ = from; Wrapping(0) }
+	fn read_word(&self, from: u16) -> u16 { let _ = from; Wrapping(0) }
+	fn input(&mut self, _port: raw::u8) -> u8 { Wrapping(0) }
+	fn output(&mut self, _port: raw::u8, _value: u8) { }
+}
 
 macro_rules! flag_name {
     ( m ) => ( "Sign" );

@@ -1,6 +1,8 @@
 use core::{ops::{Shl, ShlAssign, Index, IndexMut, DerefMut}, mem};
 use crate::{chip::State, Machine, Harness, Wrapping, bits};
 
+/// This enumerates the internal byte registers of the 8080. You can access these
+/// by indexing the State struct with them; `let val = st[Register::D];`
 #[cfg(target_endian="little")]
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
@@ -27,13 +29,9 @@ pub enum Register {
     L = 5,
 }
 
-
-impl Byte {
-    pub fn use_bus(&self) -> bool {
-        match self { Byte::Indirect | Byte::RAM(_) => true, _ => false }
-    }
-}
-
+/// A register pair in the CPU, interpreted as a little-endian 16-bit value, 
+/// where the `B`, `D` or `H` register contains the more-significant byte and 
+/// the `C`, `E` or `L` register contains the less-significant byte.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
 pub enum Double {
@@ -44,20 +42,26 @@ pub enum Double {
 
 use self::{Register as R, Double as D, Internal as I, Word as W};
 
+/// `Byte` enumerates any one-byte region that can be specified for a read or write:
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Byte {
+    /// - A byte register on the CPU chip (B, C, D, E, H, L, A)
     Single(Register),
+    /// - A byte in memory at the address contained in the `HL` register pair
     Indirect,
+    /// - A byte in memory at a specified address (usually for ops like `LXI`)
     RAM(bits::u16),
 }
 
+/// Any of the 16-bit registers in the CPU, including the register pairs, 
+/// but also the program counter and the stack pointer.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Internal {
     Wide(Double),
     ProgramCounter,
     StackPointer,
 }
-
+#[doc(hidden)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Word {
     OnBoard(Internal),
@@ -68,7 +72,15 @@ pub enum Word {
 
 #[disclose(super)]
 impl State {
-    fn flags(&self) -> u8 {
+    /// This method exposes the flag bits of the 8080 in the same format as the PSW 
+    /// pseudo-register, `mz0a0p1c`, where 
+    /// 
+    /// - `m` is the sign flag;
+    /// - `z` is the zero flag; 
+    /// - `a` is the auxilliary carry flag;
+    /// - `p` is the even-parity flag; 
+    /// - `c` is the carry flag.
+    pub fn flags(&self) -> u8 {
         self.c as u8 | 
         0b10u8 |
         (self.p as u8) << 2 |
@@ -76,6 +88,16 @@ impl State {
         (self.z as u8) << 6 |
         (self.m as u8) << 7
     }
+    /// Whether or not the processor is in a stopped state (not executing operations from the PC).
+    /// The processor will return to an active state if it receives an interrupt.
+    /// 
+    /// Note that if interrupts are disabled when the processor is halted, the processor will 
+    /// remain stopped until it is reset from outside.
+    pub fn is_stopped(&self) -> bool { !self.active }
+    /// Whether the processor is accepting interrupts; this is disabled automatically when an 
+    /// interrupt is received, to allow the interrupt to finish processing without being further 
+    /// disrupted. It is also set by the `EI` operation and reset by the `DI` operation.
+    pub fn is_interrupt_ready(&self) -> bool { self.interrupts }
     fn extract_flags(&mut self, bits: u8) {
         (self.c, self.p, self.a, self.z, self.m) = (
             bits & 0b00000001 != 0, 

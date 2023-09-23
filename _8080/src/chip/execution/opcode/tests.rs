@@ -1,6 +1,6 @@
 use super::*;    
     
-fn decode(value: &[u8]) -> crate::Result<(Op, usize), self::Error> {
+fn decode(value: &[u8]) -> Result<(Op, usize), self::Error> {
     Op::extract(value.iter().copied())
 }
 
@@ -231,6 +231,7 @@ fn internals() {
     assert_eq!(op.0, Interrupts(true));
 }
 
+#[test]
 fn io() {
     let op = decode(&[0xD3, 0x85]).unwrap();
     assert_eq!(op.0, Out(0x85));

@@ -2,6 +2,7 @@ use core::fmt::UpperHex;
 
 use crate::{bits, num::Wrapping, convert::TryFrom, chip::access::{*, Byte::*, Register::*, Word::*, Double::*, Internal::*}};
 
+/// A single action on the processor. See the 8080 Programmer's manual for details and operation effects.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Op {
     NOP(u8),

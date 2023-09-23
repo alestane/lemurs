@@ -1,4 +1,4 @@
-use lemurs_8080::{Harness, support::*, op};
+use lemurs_8080::{Harness, op};
 use core::{ops::{Deref, Index, IndexMut}, num::Wrapping};
 use std::collections::HashSet;
 
@@ -50,11 +50,11 @@ impl Deref for CP_M {
 
 impl Harness for CP_M {
     fn read(&self, from: Wrapping<u16>) -> Wrapping<u8> { Wrapping(self.ram[from.0 as usize]) }
-    fn write(&mut self, value: Wrapping<u8>, to: Wrapping<u16>) { if (0x100..).contains(&to.0) { self.ram[to.0 as usize] = value.0; } }
+    fn write(&mut self, to: Wrapping<u16>, value: Wrapping<u8>) { if (0x100..).contains(&to.0) { self.ram[to.0 as usize] = value.0; } }
     fn input(&mut self, port: u8) -> Wrapping<u8> { Wrapping(self.port[port as usize]) }
     fn output(&mut self, port: u8, value: Wrapping<u8>) { self.port[port as usize] = value.0; }
-    fn did_execute(&mut self, client: &_8080::State, _did: op::Op) -> Result<Option<op::Op>, String> {
-        use _8080::support::{Double, Register};
+    fn did_execute(&mut self, client: &lemurs_8080::State, _did: op::Op) -> Result<Option<op::Op>, String> {
+        use lemurs_8080::support::{Double, Register};
         self.order.push(client.pc);
         if client.pc.0 >= 0x01AB && self.history.contains(&client.pc) {
             eprintln!("\n{:?}", self.order);

@@ -1,53 +1,16 @@
 pub use execution::opcode;
 
-use core::cell::UnsafeCell;
+use crate::{Harness, ops::DerefMut, Machine, bits::*, num::Wrapping};
 
-use crate::{Harness, ops::{Deref, DerefMut, Index, IndexMut}, Machine, raw, bits::*, num::Wrapping};
-
-#[cfg(not(feature="open"))]
+#[cfg(not(any(doc, feature="open")))]
 pub(self) mod access;
-#[cfg(feature="open")]
+#[cfg(any(doc, feature="open"))]
 pub mod access;
 mod execution;
 
-pub struct Socket(UnsafeCell<u8>);
-
-impl Socket {
-	pub fn new() -> Self {
-		Self::default()
-	}
-}
-
-impl Default for Socket {
-	fn default() -> Self{
-		Socket(UnsafeCell::default())
-	}
-}
-
-impl Index<u16> for Socket {
-	type Output = u8;
-	fn index(&self, _index: u16) -> &Self::Output { let i = self.0.get(); unsafe {*i = Wrapping(0); &*i} }
-}
-
-impl IndexMut<u16> for Socket {
-	fn index_mut(&mut self, _index: u16) -> &mut Self::Output { let i = self.0.get_mut(); *i = Wrapping(0); i }
-}
-
-impl Deref for Socket {
-	type Target = [u8];
-	fn deref(&self) -> &Self::Target {
-		core::slice::from_ref(unsafe{self.0.get().as_ref().unwrap_unchecked()})
-	}
-}
-
-impl Harness for Socket {
-	fn read(&self, from: u16) -> u8 { let _ = from; Wrapping(0) }
-	fn read_word(&self, from: u16) -> u16 { let _ = from; Wrapping(0) }
-	fn input(&mut self, _port: raw::u8) -> u8 { Wrapping(0) }
-	fn output(&mut self, _port: raw::u8, _value: u8) { }
-}
+/// This struct stores the internal registers and flags of the 8080 CPU.
 #[repr(C)]
-#[cfg_attr(feature="open", disclose)]
+#[disclose(crate)]
 pub struct State {
 	pc: u16,
 	sp: u16,
@@ -59,6 +22,7 @@ pub struct State {
 pub use access::Byte;
 
 impl State {
+	/// Creates a fresh state with the processor in an active state and all registers reset.
 	pub fn new() -> Self {
 		Self {
 			register: [Wrapping(0);7], 
@@ -71,7 +35,7 @@ impl State {
 
 #[cfg(feature="open")]
 impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Iterator for Machine<H, C> {
-	type Item = Result<core::primitive::u8, crate::String>;	
+	type Item = Result<core::primitive::u8, crate::string::String>;	
 	fn next(&mut self) -> Option<Self::Item> {
 		let result = self.execute();
 		match result {

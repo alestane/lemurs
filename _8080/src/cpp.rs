@@ -1,7 +1,8 @@
 #[cfg(not(test))]
 extern crate cpp;
 
-use crate::Box;
+use crate::boxed::Box;
+use crate::chip::opcode::Op;
 
 use core::{marker::PhantomData, num::Wrapping, ops::{Deref, DerefMut}};
 
@@ -83,7 +84,7 @@ extern "C-unwind" fn machine_execute(host: &mut Machine) -> u8 {
 
 #[no_mangle]
 extern "C-unwind" fn machine_interrupt(host:&mut Machine, code: u8) -> bool {
-    unsafe { host.interrupt(crate::chip::opcode::Op::extract(core::iter::once(code)).expect("not a valid interrupt code.").0).unwrap_unchecked() }
+    unsafe { host.interrupt(Op::extract(core::iter::once(code)).expect("not a valid interrupt code.").0).unwrap_unchecked() }
 }
 
 #[no_mangle]
@@ -122,12 +123,12 @@ impl crate::Harness for Harness {
         unsafe { output_harness(self, port, value) }
     }
     #[cfg(feature="open")]
-    fn did_execute(&mut self, client: &crate::State, did: crate::Op) -> Result<Option<crate::Op>, crate::String> {
+    fn did_execute(&mut self, client: &crate::State, did: Op) -> Result<Option<Op>, crate::string::String> {
         use core::{mem::transmute, ffi::CStr};
         unsafe {
             match did_execute_harness(self, client, u32::from_be_bytes(did.into())) {
                 None => Ok(None),
-                Some(code@&[0, ..]) => Ok(Some(crate::Op::extract(code[1..].iter().copied()).or(Err(crate::String::from("Not a valid opcode")))?.0)),
+                Some(code@&[0, ..]) => Ok(Some(Op::extract(code[1..].iter().copied()).or(Err(crate::string::String::from("Not a valid opcode")))?.0)),
                 Some(bytes) => Err(CStr::from_ptr(transmute(bytes)).to_string_lossy().into_owned()),
             }
         }
