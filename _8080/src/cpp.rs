@@ -57,13 +57,13 @@ extern "C" fn request_default_impl(host: &Machine) -> Option<&crate::SimpleBoard
 }
 
 #[no_mangle]
-#[cfg(debug_assertions)]
+#[cfg(feature="open")]
 extern "C" fn machine_state(host: &Machine) -> &crate::State {
     host.as_ref()
 }
 
 #[no_mangle]
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature="open"))]
 extern "C-unwind" fn machine_execute(host: &mut Machine) -> u8 {
     match host.execute() {
         None => 0,
@@ -72,7 +72,7 @@ extern "C-unwind" fn machine_execute(host: &mut Machine) -> u8 {
 }
 
 #[no_mangle]
-#[cfg(debug_assertions)]
+#[cfg(feature="open")]
 extern "C-unwind" fn machine_execute(host: &mut Machine) -> u8 {
     match host.execute() {
         Ok(None) => 0,
@@ -98,7 +98,7 @@ extern "C-unwind" {
     fn write_word_harness(host: &mut Harness, address: Wrapping<u16>, value: Wrapping<u16>);
     fn input_harness(host: &Harness, port: u8) -> Wrapping<u8>;
     fn output_harness(host: &mut Harness, port: u8, value: Wrapping<u8>);
-    #[cfg(debug_assertions)]
+    #[cfg(feature="open")]
     fn did_execute_harness(host: &mut Harness, chip: &crate::State, op: u32) -> Option<&'static [u8;4]>;
 }
 
@@ -121,7 +121,7 @@ impl crate::Harness for Harness {
     fn output(&mut self, port: u8, value: Wrapping<u8>) {
         unsafe { output_harness(self, port, value) }
     }
-    #[cfg(debug_assertions)]
+    #[cfg(feature="open")]
     fn did_execute(&mut self, client: &crate::State, did: crate::Op) -> Result<Option<crate::Op>, crate::String> {
         use core::{mem::transmute, ffi::CStr};
         unsafe {

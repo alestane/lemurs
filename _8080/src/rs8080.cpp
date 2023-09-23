@@ -14,9 +14,10 @@ extern "C" {
 	bool machine_interrupt(machine& host, byte code);
 
 	void discard_machine(machine* host);
-#ifndef NDEBUG
+
+	#ifdef _8080_INTERNALS
 	const i8080::state& machine_state(const machine& host);
-#endif
+	#endif
 }
 
 extern "C" byte read_harness(const board& host, word address) 
@@ -49,7 +50,7 @@ extern "C" void output_harness(board& host, byte port, byte value)
 	host.output(port, value);
 }
 
-#ifndef NDEBUG
+#ifdef _8080_INTERNALS
 extern "C" const byte* did_execute_harness(board& host, const i8080::state& chip, byte op[4])
 {
 	return host.did_execute(chip, op);
@@ -78,10 +79,11 @@ namespace i8080 {
 	{
 		return machine_interrupt(*this, code);
 	}
-#ifndef NDEBUG
+
+	#ifdef _8080_INTERNALS
 	const state& machine::operator*() const 
 	{
 		return machine_state(*this);
 	}
-#endif
+	#endif
 }

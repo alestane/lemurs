@@ -7,9 +7,9 @@ use opcode::{Op, Op::*};
 
 pub type Failure = String;
 
-#[cfg(debug_assertions)]
+#[cfg(feature="open")]
 pub(super) type OpOutcome = Result<Option<NonZeroU8>, Failure>;
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature="open"))]
 pub(super) type OpOutcome = Option<NonZeroU8>;
 
 impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Machine<H, C> {
@@ -18,7 +18,7 @@ impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Machine<H, C> {
         core::iter::from_fn(move || {let val = self.board.read(start).0; start += 1; Some(val)})
     }
 
-    #[cfg(debug_assertions)]
+    #[cfg(feature="open")]
 	pub fn execute(&mut self) -> OpOutcome {
 		if !self.chip.active { return Ok(NonZeroU8::new(1)) };
         let (op, len) = Op::extract(self.from_pc())
@@ -36,7 +36,7 @@ impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Machine<H, C> {
         outcome
 	}
 
-    #[cfg(not(debug_assertions))]
+    #[cfg(not(feature="open"))]
 	pub fn execute(&mut self) -> OpOutcome {
 		if !self.chip.active { return NonZeroU8::new(1) };
         let (op, len) = Op::extract(self.from_pc())
@@ -401,7 +401,7 @@ impl Op {
             _ => unimplemented!("Op {self:?} not implemented yet")
         };
         let cycles = NonZeroU8::new(cycles);
-        #[cfg(debug_assertions)]
+        #[cfg(feature="open")]
         let cycles = Ok(cycles);
         cycles
     }

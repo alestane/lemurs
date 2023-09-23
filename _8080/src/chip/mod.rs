@@ -1,14 +1,12 @@
-#![allow(dead_code)]
-
 pub use execution::opcode;
 
 use core::cell::UnsafeCell;
 
 use crate::{Harness, ops::{Deref, DerefMut, Index, IndexMut}, Machine, raw, bits::*, num::Wrapping};
 
-#[cfg(not(any(feature="open", debug_assertions)))]
+#[cfg(not(feature="open"))]
 pub(self) mod access;
-#[cfg(any(feature="open", debug_assertions))]
+#[cfg(feature="open")]
 pub mod access;
 mod execution;
 
@@ -49,7 +47,7 @@ impl Harness for Socket {
 	fn output(&mut self, _port: raw::u8, _value: u8) { }
 }
 #[repr(C)]
-#[cfg_attr(debug_assertions, disclose)]
+#[cfg_attr(feature="open", disclose)]
 pub struct State {
 	pc: u16,
 	sp: u16,
@@ -71,7 +69,7 @@ impl State {
 	}
 }
 
-#[cfg(debug_assertions)]
+#[cfg(feature="open")]
 impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Iterator for Machine<H, C> {
 	type Item = Result<core::primitive::u8, crate::String>;	
 	fn next(&mut self) -> Option<Self::Item> {
@@ -84,7 +82,7 @@ impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Iterator for Machine<H, C> {
 	}
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature="open"))]
 impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Iterator for Machine<H, C> {
 	type Item = core::primitive::u8;
 	fn next(&mut self) -> Option<Self::Item> {

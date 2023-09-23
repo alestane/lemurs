@@ -11,10 +11,8 @@ fn compile<F : FnOnce(&mut Build)> (file: PathBuf, process: Option<F>) -> Result
 			.cpp(true)
 			.file(file.clone())
 	    	.include("include");
-		#[cfg(debug_assertions)]
-		job.define("DEBUG", "true");
-		#[cfg(not(debug_assertions))]
-		job.define("NDEBUG", "true");
+		#[cfg(feature="open")]
+		job.define("_8080_INTERNALS", "open");
 		if let Some(process) = process {
 			process(&mut job);
 		}

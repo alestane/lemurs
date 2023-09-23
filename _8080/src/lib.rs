@@ -45,7 +45,7 @@ mod bits {
 use crate::ops::{Deref, DerefMut, Index, IndexMut, Range, RangeFull, RangeFrom, RangeTo, RangeToInclusive};
 pub use core::result::Result;
 
-#[cfg(debug_assertions)]
+#[cfg(feature="open")]
 pub use chip::State;
 
 #[cfg(feature="open")]
@@ -58,7 +58,7 @@ pub mod support {
 pub mod op {
     pub use crate::chip::opcode::{Op::{self, *}, Flag::*, Test::*};
 }
-#[cfg(debug_assertions)]
+#[cfg(feature="open")]
 pub use crate::chip::opcode::Op;
 
 pub trait Harness {
@@ -74,7 +74,7 @@ pub trait Harness {
     }
 	fn input(&mut self, port: u8) -> bits::u8;
 	fn output(&mut self, port: u8, value: bits::u8);
-    #[cfg(debug_assertions)]
+    #[cfg(feature="open")]
     fn did_execute(&mut self, client: &State, did: Op) -> Result<Option<Op>, String> { let _ = (client, did); Ok( None ) }
     fn as_any(&self) -> Option<&dyn any::Any> { None }
 }
@@ -195,12 +195,12 @@ impl<H: Harness + ?Sized, C: DerefMut<Target = H>> DerefMut for Machine<H, C> {
     fn deref_mut(&mut self) -> &mut Self::Target { self.board.deref_mut() }
 }
 
-#[cfg(debug_assertions)]
+#[cfg(feature="open")]
 impl<H: Harness + ?Sized, C: DerefMut<Target = H>> AsRef<State> for Machine<H, C> {
     fn as_ref(&self) -> &State { &self.chip }
 }
 
-#[cfg(debug_assertions)]
+#[cfg(feature="open")]
 impl<H: Harness + ?Sized, C: DerefMut<Target = H>> AsMut<State> for Machine<H, C> {
     fn as_mut(&mut self) -> &mut State { &mut self.chip }
 }
