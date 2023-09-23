@@ -7,16 +7,12 @@ description = "An emulator for the Intel 8080 microprocessor"
 readme = "README.md"
 license = "UPL-1.0"
 
-exclude = ["cpp8080/*"]
-build = "../cppsrc.rs"
-
-
 [lib]
 crate-type = ["rlib", "staticlib"]
 
 [[test]]
 name = "cpudiag"
-required-features = ["open"]
+required-features = ["std", "open"]
 
 [dependencies]
 disclose = "0"
