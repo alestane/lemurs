@@ -2,3 +2,6 @@
 members = ["_8080"]
 resolver = "2"
 default-members = ["_8080"]
+
+[workspace.package]
+repository = "https://github.com/alestane/lemurs"
