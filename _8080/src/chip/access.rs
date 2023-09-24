@@ -1,5 +1,5 @@
 use core::{ops::{Shl, ShlAssign, Index, IndexMut, DerefMut}, mem};
-use crate::{chip::State, Machine, Harness, Wrapping, bits};
+use crate::{chip::State, Machine, Harness, Wrapping, bits, borrow::BorrowMut};
 
 /// This enumerates the internal byte registers of the 8080. You can access these
 /// by indexing the State struct with them; `let val = st[Register::D];`
@@ -192,50 +192,50 @@ impl IndexMut<Internal> for State {
     }
 }
 
-impl<H: Harness + ?Sized, A: DerefMut<Target = H>> Shl<&Machine<A>> for bits::u16 {
+impl<H: Harness + ?Sized, B: BorrowMut<H>> Shl<&Machine<H, B, B>> for bits::u16 {
     type Output = bits::u16;
-    fn shl(self, host: &Machine<A>) -> Self::Output {
-        host.board.read_word(self)
+    fn shl(self, host: &Machine<H, B, B>) -> Self::Output {
+        host.board.borrow().read_word(self)
     }
 }
 
-impl<H: Harness + ?Sized, A: DerefMut<Target = H>> Shl<&Machine<A>> for Word {
+impl<H: Harness + ?Sized, B: BorrowMut<H>> Shl<&Machine<H, B, B>> for Word {
     type Output = bits::u16;
-    fn shl(self, host: &Machine<A>) -> Self::Output {
+    fn shl(self, host: &Machine<H, B, B>) -> Self::Output {
         match self {
             Self::OnBoard(internal) => host.chip[internal],
             Self::ProgramStatus => Wrapping(u16::from_le_bytes([host.chip.register[6].0, host.chip.flags()])),
-            Self::RAM(i) => host.board.read_word(i),
+            Self::RAM(i) => host.board.borrow().read_word(i),
             Self::Stack => panic!("Can't pop from stack without mutate access"),
         }
     }
 }
 
-impl<H: Harness + ?Sized, A: DerefMut<Target = H>> Shl<&mut Machine<A>> for Word {
+impl<H: Harness + ?Sized, B: BorrowMut<H>> Shl<&mut Machine<H, B, B>> for Word {
     type Output = bits::u16;
-    fn shl(self, host: &mut Machine<A>) -> Self::Output {
+    fn shl(self, host: &mut Machine<H, B, B>) -> Self::Output {
         match self {
             Word::Stack => {
                 let addr = host.chip.sp;
                 host.chip.sp += 2;
-                host.board.read_word(addr)
+                host.board.borrow_mut().read_word(addr)
             }
             _ => self << &*host,
         }
     }
 }
 
-impl<H: Harness + ?Sized, A: DerefMut<Target = H>> ShlAssign<(bits::u16, bits::u16)> for Machine<A> {
+impl<H: Harness + ?Sized, B: BorrowMut<H>> ShlAssign<(bits::u16, bits::u16)> for Machine<H, B, B> {
     fn shl_assign(&mut self, (index, value): (bits::u16, bits::u16)) {
-        self.board.write_word(index, value);
+        self.board.borrow_mut().write_word(index, value);
     }
 }
 
-impl<H: Harness + ?Sized, A: DerefMut<Target = H>> ShlAssign<(Word, bits::u16)> for Machine<A> {
+impl<H: Harness + ?Sized, B: BorrowMut<H>> ShlAssign<(Word, bits::u16)> for Machine<H, B, B> {
     fn shl_assign(&mut self, (index, value): (Word, bits::u16)) {
         match index {
             W::OnBoard(internal) => self.chip[internal] = value,
-            W::RAM(address) => self.board.write_word(address, value),
+            W::RAM(address) => self.board.borrow_mut().write_word(address, value),
             W::ProgramStatus => {
                 let [a, f] = value.0.to_le_bytes();
                 self.chip[R::A] = Wrapping(a);
@@ -243,7 +243,8 @@ impl<H: Harness + ?Sized, A: DerefMut<Target = H>> ShlAssign<(Word, bits::u16)> 
             }
             W::Stack => {
                 self.chip.sp -= 2;
-                self.board.write_word(self.chip.sp, value);
+                let sp = self.chip.sp;
+                self.board.borrow_mut().write_word(sp, value);
             }
         }
     }

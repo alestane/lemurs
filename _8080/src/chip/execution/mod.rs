@@ -1,5 +1,5 @@
-use core::ops::DerefMut;
-use crate::{raw, bits::*, num::{NonZeroU8, Wrapping}, Machine, Harness};
+use core::{num::{NonZeroU8, Wrapping}, borrow::BorrowMut, ops::DerefMut};
+use crate::{raw, bits::*, Machine, Harness};
 use super::{State, access::{*, Register::*, Byte::*, Double::*, Internal::*, Word::*}};
 
 pub mod opcode;
@@ -10,10 +10,10 @@ pub(super) type OpOutcome = Result<Option<NonZeroU8>, crate::string::String>;
 #[cfg(not(feature="open"))]
 pub(super) type OpOutcome = Option<NonZeroU8>;
 
-impl<H: Harness + ?Sized, A: DerefMut<Target = H>> Machine<A> {
+impl<H: Harness + ?Sized, B: BorrowMut<H>> Machine<H, B, B> {
     fn from_pc(&self) -> impl Iterator<Item=raw::u8> + '_ {
         let mut start = self.chip.pc;
-        core::iter::from_fn(move || {let val = self.board.read(start).0; start += 1; Some(val)})
+        core::iter::from_fn(move || {let val = self.board.borrow().read(start).0; start += 1; Some(val)})
     }
 
     #[doc(hidden)]
@@ -23,12 +23,12 @@ impl<H: Harness + ?Sized, A: DerefMut<Target = H>> Machine<A> {
         let (op, len) = Op::extract(self.from_pc())
             .map_err(|e| panic!("Couldn't extract opcode from {e:X} at {:#06X}", self.chip.pc)).unwrap();
         self.chip.pc += len as raw::u16;
-        let outcome = op.execute_on(&mut self.chip, self.board.deref_mut());
+        let outcome = op.execute_on(&mut self.chip, self.board.borrow_mut());
         if outcome.is_err() {
             self.chip.active = false;
         };
         if let Some(action) = self.board.did_execute(&self.chip, op)? {
-            action.execute_on(&mut self.chip, self.board.deref_mut()).unwrap();
+            action.execute_on(&mut self.chip, self.board.borrow_mut()).unwrap();
             if action == Halt { return Ok(None); }
         }
         outcome
@@ -51,7 +51,7 @@ impl<H: Harness + ?Sized, A: DerefMut<Target = H>> Machine<A> {
         let (op, len) = Op::extract(self.from_pc())
             .map_err(|e| panic!("Couldn't extract opcode from {e:X?}")).unwrap();
         self.chip.pc += len as raw::u16;
-        let elapsed = op.execute_on(&mut self.chip, self.board.deref_mut());
+        let elapsed = op.execute_on(&mut self.chip, self.board.borrow_mut());
         if elapsed.is_none() { self.chip.active = false; }
         elapsed
 	}
@@ -70,7 +70,7 @@ impl<H: Harness + ?Sized, A: DerefMut<Target = H>> Machine<A> {
             Ok(self.chip.interrupts && {
                 self.chip.active = true;
                 self.chip.interrupts = false;
-                let _ = op.execute_on(&mut self.chip, self.board.deref_mut());
+                let _ = op.execute_on(&mut self.chip, self.board.borrow_mut());
                 true
             })
         } else {

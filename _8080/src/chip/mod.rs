@@ -1,6 +1,7 @@
 pub use execution::opcode;
 
-use crate::{Harness, ops::DerefMut, Machine, bits::*, num::Wrapping};
+use core::{borrow::BorrowMut, num::Wrapping, ops::DerefMut};
+use crate::{Harness, Machine, bits::*};
 
 #[cfg(not(any(doc, feature="open")))]
 pub(self) mod access;
@@ -34,7 +35,7 @@ impl State {
 }
 
 #[cfg(feature="open")]
-impl<H: Harness + ?Sized, A: DerefMut<Target = H>> Iterator for Machine<A> {
+impl<H: Harness + ?Sized, B: BorrowMut<H>> Iterator for Machine<H, B, B> {
 	type Item = Result<core::primitive::u8, crate::string::String>;
 	fn next(&mut self) -> Option<Self::Item> {
 		let result = self.execute();
@@ -47,7 +48,7 @@ impl<H: Harness + ?Sized, A: DerefMut<Target = H>> Iterator for Machine<A> {
 }
 
 #[cfg(not(feature="open"))]
-impl<H: Harness + ?Sized, A: DerefMut<Target = H>> Iterator for Machine<A> {
+impl<H: Harness + ?Sized, B: BorrowMut<H>> Iterator for Machine<H, B, B> {
 	type Item = core::primitive::u8;
 	fn next(&mut self) -> Option<Self::Item> {
 		use core::num::NonZeroU8;
