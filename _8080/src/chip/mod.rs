@@ -25,17 +25,17 @@ impl State {
 	/// Creates a fresh state with the processor in an active state and all registers reset.
 	pub fn new() -> Self {
 		Self {
-			register: [Wrapping(0);7], 
-			c: false, a: false, p: false, m: false, z: false, 
-			active: true, interrupts: false, 
-			pc: Wrapping(0), sp: Wrapping(0), 
+			register: [Wrapping(0);7],
+			c: false, a: false, p: false, m: false, z: false,
+			active: true, interrupts: false,
+			pc: Wrapping(0), sp: Wrapping(0),
 		}
 	}
 }
 
 #[cfg(feature="open")]
-impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Iterator for Machine<H, C> {
-	type Item = Result<core::primitive::u8, crate::string::String>;	
+impl<H: Harness + ?Sized, A: DerefMut<Target = H>> Iterator for Machine<A> {
+	type Item = Result<core::primitive::u8, crate::string::String>;
 	fn next(&mut self) -> Option<Self::Item> {
 		let result = self.execute();
 		match result {
@@ -47,7 +47,7 @@ impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Iterator for Machine<H, C> {
 }
 
 #[cfg(not(feature="open"))]
-impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Iterator for Machine<H, C> {
+impl<H: Harness + ?Sized, A: DerefMut<Target = H>> Iterator for Machine<A> {
 	type Item = core::primitive::u8;
 	fn next(&mut self) -> Option<Self::Item> {
 		use core::num::NonZeroU8;

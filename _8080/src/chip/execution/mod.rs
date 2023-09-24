@@ -10,7 +10,7 @@ pub(super) type OpOutcome = Result<Option<NonZeroU8>, crate::string::String>;
 #[cfg(not(feature="open"))]
 pub(super) type OpOutcome = Option<NonZeroU8>;
 
-impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Machine<H, C> {
+impl<H: Harness + ?Sized, A: DerefMut<Target = H>> Machine<A> {
     fn from_pc(&self) -> impl Iterator<Item=raw::u8> + '_ {
         let mut start = self.chip.pc;
         core::iter::from_fn(move || {let val = self.board.read(start).0; start += 1; Some(val)})
@@ -22,7 +22,7 @@ impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Machine<H, C> {
 		if !self.chip.active { return Ok(NonZeroU8::new(1)) };
         let (op, len) = Op::extract(self.from_pc())
             .map_err(|e| panic!("Couldn't extract opcode from {e:X} at {:#06X}", self.chip.pc)).unwrap();
-        self.chip.pc += len as raw::u16; 
+        self.chip.pc += len as raw::u16;
         let outcome = op.execute_on(&mut self.chip, self.board.deref_mut());
         if outcome.is_err() {
             self.chip.active = false;
@@ -34,51 +34,51 @@ impl<H: Harness + ?Sized, C: DerefMut<Target = H>> Machine<H, C> {
         outcome
 	}
 
-    /// The `execute` method is the heart and soul of emulation; it retrieves, decodes, and executes 
+    /// The `execute` method is the heart and soul of emulation; it retrieves, decodes, and executes
     /// one operation from the Harness address space, and updates the CPU's internal state accordingly.
-    /// 
-    /// The method returns an optional non-zero 8-bit number indicating the number of CPU cycles 
+    ///
+    /// The method returns an optional non-zero 8-bit number indicating the number of CPU cycles
     /// consumed, which you can use for timing control, or no value if the chip could not proceed.
-    /// 
-    /// When the crate is compiled with the `"open"` feature, this method instead returns a `Result`, 
-    /// which contains the same optional u8 as the regular form in its `Ok` option or a `String` 
+    ///
+    /// When the crate is compiled with the `"open"` feature, this method instead returns a `Result`,
+    /// which contains the same optional u8 as the regular form in its `Ok` option or a `String`
     /// describing the failure in the `Err` option.
-    /// 
+    ///
     /// For details of the chip operation and instruction set, see the 8080 Programmer's Manual.
     #[cfg(any(not(feature="open"), doc))]
 	pub fn execute(&mut self) -> OpOutcome {
 		if !self.chip.active { return NonZeroU8::new(1) };
         let (op, len) = Op::extract(self.from_pc())
             .map_err(|e| panic!("Couldn't extract opcode from {e:X?}")).unwrap();
-        self.chip.pc += len as raw::u16; 
+        self.chip.pc += len as raw::u16;
         let elapsed = op.execute_on(&mut self.chip, self.board.deref_mut());
         if elapsed.is_none() { self.chip.active = false; }
         elapsed
 	}
 
-    /// This method submits an interrupt request containing any operation that can be contained 
-    /// in one byte. If the core's interrupts flag is reset, no action will be taken and the 
-    /// method will return `Ok(false)`. If the flag is set and the operation fits into a single 
-    /// byte (a technical requirement of the original chip), it will reset the interrupts flag 
-    /// (disabling interrupts until further notice; interrupt vectors should be written to set 
+    /// This method submits an interrupt request containing any operation that can be contained
+    /// in one byte. If the core's interrupts flag is reset, no action will be taken and the
+    /// method will return `Ok(false)`. If the flag is set and the operation fits into a single
+    /// byte (a technical requirement of the original chip), it will reset the interrupts flag
+    /// (disabling interrupts until further notice; interrupt vectors should be written to set
     /// the flag before returning) and execute the supplied instruction, then return `Ok(true)`.
-    /// 
-    /// If the operation cannot fit into a single byte, the operation will return a 
+    ///
+    /// If the operation cannot fit into a single byte, the operation will return a
     /// `Err(NotUsable(_))` value containing the submitted operation and take no further action.
     pub fn interrupt(&mut self, op: Op) -> Result<bool, opcode::Error> {
         if op.len() == 1 {
-            Ok(self.chip.interrupts && { 
-                self.chip.active = true; 
-                self.chip.interrupts = false; 
-                let _ = op.execute_on(&mut self.chip, self.board.deref_mut()); 
-                true 
+            Ok(self.chip.interrupts && {
+                self.chip.active = true;
+                self.chip.interrupts = false;
+                let _ = op.execute_on(&mut self.chip, self.board.deref_mut());
+                true
             })
         } else {
             Err(opcode::Error::NotUsable(op))
         }
     }
 
-    /// This method is a convenience shorthand for `interrupt` that assumes the desired 
+    /// This method is a convenience shorthand for `interrupt` that assumes the desired
     /// operation is a RST action, saving the address of the next instruction of the stack
     /// and jumping to one of the addresses 0x00, 0x80, 0x10, 0x18, 0x20, 0x28, 0x30, 0x38, 0x40 or 0x48.
     pub fn reset_to(&mut self, index: usize) -> Result<bool, opcode::OutOfRange> {
@@ -188,8 +188,8 @@ impl Op {
             DecrementByte { register } => {
                 let (value, time) = match chip.resolve(register) {
                     Single(reg) => { chip[reg] -= 1; (chip[reg], 5)}
-                    Byte::RAM(address) => { 
-                        let value = bus.read(address) - Wrapping(1); 
+                    Byte::RAM(address) => {
+                        let value = bus.read(address) - Wrapping(1);
                         bus.write(address, value);
                         (value, 10)
                     }
@@ -239,8 +239,8 @@ impl Op {
             IncrementByte { register } => {
                 let (value, time) = match chip.resolve(register) {
                     Single(reg) => { chip[reg] += 1; (chip[reg], 5)}
-                    Byte::RAM(address) => { 
-                        let value = bus.read(address) + Wrapping(1); 
+                    Byte::RAM(address) => {
+                        let value = bus.read(address) + Wrapping(1);
                         bus.write(address, value);
                         (value, 10)
                     }

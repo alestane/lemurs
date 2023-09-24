@@ -11,7 +11,7 @@ pub enum Register {
     B = 1,
     C = 0,
     D = 3,
-    E = 2, 
+    E = 2,
     H = 5,
     L = 4,
 }
@@ -24,13 +24,13 @@ pub enum Register {
     B = 0,
     C = 1,
     D = 2,
-    E = 3, 
+    E = 3,
     H = 4,
     L = 5,
 }
 
-/// A register pair in the CPU, interpreted as a little-endian 16-bit value, 
-/// where the `B`, `D` or `H` register contains the more-significant byte and 
+/// A register pair in the CPU, interpreted as a little-endian 16-bit value,
+/// where the `B`, `D` or `H` register contains the more-significant byte and
 /// the `C`, `E` or `L` register contains the less-significant byte.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
@@ -53,7 +53,7 @@ pub enum Byte {
     RAM(bits::u16),
 }
 
-/// Any of the 16-bit registers in the CPU, including the register pairs, 
+/// Any of the 16-bit registers in the CPU, including the register pairs,
 /// but also the program counter and the stack pointer.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Internal {
@@ -72,16 +72,16 @@ pub enum Word {
 
 #[disclose(super)]
 impl State {
-    /// This method exposes the flag bits of the 8080 in the same format as the PSW 
-    /// pseudo-register, `mz0a0p1c`, where 
-    /// 
+    /// This method exposes the flag bits of the 8080 in the same format as the PSW
+    /// pseudo-register, `mz0a0p1c`, where
+    ///
     /// - `m` is the sign flag;
-    /// - `z` is the zero flag; 
+    /// - `z` is the zero flag;
     /// - `a` is the auxilliary carry flag;
-    /// - `p` is the even-parity flag; 
+    /// - `p` is the even-parity flag;
     /// - `c` is the carry flag.
     pub fn flags(&self) -> u8 {
-        self.c as u8 | 
+        self.c as u8 |
         0b10u8 |
         (self.p as u8) << 2 |
         (self.a as u8) << 4 |
@@ -90,17 +90,17 @@ impl State {
     }
     /// Whether or not the processor is in a stopped state (not executing operations from the PC).
     /// The processor will return to an active state if it receives an interrupt.
-    /// 
-    /// Note that if interrupts are disabled when the processor is halted, the processor will 
+    ///
+    /// Note that if interrupts are disabled when the processor is halted, the processor will
     /// remain stopped until it is reset from outside.
     pub fn is_stopped(&self) -> bool { !self.active }
-    /// Whether the processor is accepting interrupts; this is disabled automatically when an 
-    /// interrupt is received, to allow the interrupt to finish processing without being further 
+    /// Whether the processor is accepting interrupts; this is disabled automatically when an
+    /// interrupt is received, to allow the interrupt to finish processing without being further
     /// disrupted. It is also set by the `EI` operation and reset by the `DI` operation.
     pub fn is_interrupt_ready(&self) -> bool { self.interrupts }
     fn extract_flags(&mut self, bits: u8) {
         (self.c, self.p, self.a, self.z, self.m) = (
-            bits & 0b00000001 != 0, 
+            bits & 0b00000001 != 0,
             bits & 0b00000100 != 0,
             bits & 0b00010000 != 0,
             bits & 0b01000000 != 0,
@@ -192,16 +192,16 @@ impl IndexMut<Internal> for State {
     }
 }
 
-impl<H: Harness, C: DerefMut<Target = H>> Shl<&Machine<H, C>> for bits::u16 {
+impl<H: Harness + ?Sized, A: DerefMut<Target = H>> Shl<&Machine<A>> for bits::u16 {
     type Output = bits::u16;
-    fn shl(self, host: &Machine<H, C>) -> Self::Output {
+    fn shl(self, host: &Machine<A>) -> Self::Output {
         host.board.read_word(self)
     }
 }
 
-impl<H: Harness, C: DerefMut<Target = H>> Shl<&Machine<H, C>> for Word {
+impl<H: Harness + ?Sized, A: DerefMut<Target = H>> Shl<&Machine<A>> for Word {
     type Output = bits::u16;
-    fn shl(self, host: &Machine<H, C>) -> Self::Output {
+    fn shl(self, host: &Machine<A>) -> Self::Output {
         match self {
             Self::OnBoard(internal) => host.chip[internal],
             Self::ProgramStatus => Wrapping(u16::from_le_bytes([host.chip.register[6].0, host.chip.flags()])),
@@ -211,9 +211,9 @@ impl<H: Harness, C: DerefMut<Target = H>> Shl<&Machine<H, C>> for Word {
     }
 }
 
-impl<H: Harness, C: DerefMut<Target = H>> Shl<&mut Machine<H, C>> for Word {
+impl<H: Harness + ?Sized, A: DerefMut<Target = H>> Shl<&mut Machine<A>> for Word {
     type Output = bits::u16;
-    fn shl(self, host: &mut Machine<H, C>) -> Self::Output {
+    fn shl(self, host: &mut Machine<A>) -> Self::Output {
         match self {
             Word::Stack => {
                 let addr = host.chip.sp;
@@ -225,13 +225,13 @@ impl<H: Harness, C: DerefMut<Target = H>> Shl<&mut Machine<H, C>> for Word {
     }
 }
 
-impl<H: Harness, C: DerefMut<Target = H>> ShlAssign<(bits::u16, bits::u16)> for Machine<H, C> {
+impl<H: Harness + ?Sized, A: DerefMut<Target = H>> ShlAssign<(bits::u16, bits::u16)> for Machine<A> {
     fn shl_assign(&mut self, (index, value): (bits::u16, bits::u16)) {
         self.board.write_word(index, value);
     }
 }
 
-impl<H: Harness, C: DerefMut<Target = H>> ShlAssign<(Word, bits::u16)> for Machine<H, C> {
+impl<H: Harness + ?Sized, A: DerefMut<Target = H>> ShlAssign<(Word, bits::u16)> for Machine<A> {
     fn shl_assign(&mut self, (index, value): (Word, bits::u16)) {
         match index {
             W::OnBoard(internal) => self.chip[internal] = value,
