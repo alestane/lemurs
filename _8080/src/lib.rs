@@ -38,18 +38,21 @@ extern crate disclose;
 #[cfg(feature="std")]
 mod foundation {
     extern crate std;
-    pub use std::{borrow, boxed, vec, array, convert, num, string, result, ops, slice, any};
+    pub use std::{any, array, borrow, boxed, convert, num, ops, rc, result, slice, string, sync, vec};
 }
 #[cfg(not(feature="std"))]
 mod foundation {
     extern crate alloc;
-    pub use alloc::{boxed, vec, string};
+    pub use alloc::{boxed, rc, string, vec};
     pub use core::{array, borrow, convert, num, result, ops, slice, any};
 }
 use foundation::num::Wrapping;
 use foundation::*;
+#[allow(unused_imports)]
+use self::boxed::Box;
+use self::rc::Rc;
 
-use core::{borrow::{Borrow, BorrowMut}, marker::PhantomData};
+use core::{borrow::BorrowMut, cell::RefCell, marker::PhantomData};
 
 mod chip;
 
@@ -144,19 +147,15 @@ pub trait Harness {
     /// Machine stores a `dyn Harness` trait object.
     fn as_any(&self) -> Option<&dyn any::Any> { None }
 }
-/*
-impl<A> Harness for A where A: BorrowMut<impl Harness + ?Sized> {
-	fn read(&self, address: bits:: u16) -> bits::u8 { self.borrow_mut().read(address) }
-	fn read_word(&self, address: bits::u16) -> bits::u16 { self.borrow_mut().read_word(address) }
-	fn write(&mut self, address: bits::u16, value: bits::u8) { self.borrow_mut().write(address, value) }
-	fn write_word(&mut self, address: bits::u16, value: bits::u16) { self.borrow_mut().write_word(address, value) }
-	fn input(&mut self, port: u8) -> bits::u8 { self.borrow_mut().input(port) }
-	fn output(&mut self, port: u8, value: bits::u8) { self.borrow_mut().output(port, value) }
-	#[cfg(feature="open")]
-	fn did_execute(&mut self, client: &State, did: chip::opcode::Op) -> Result<Option<chip::opcode::Op>, string::String> {
-		self.borrow_mut().did_execute(client, did)
-	}
-}*/
+
+type Shared<H, C> = Rc<RefCell<(C, PhantomData<H>)>>;
+
+impl<H: Harness + ?Sized, C: BorrowMut<H>> Harness for Shared<H, C> {
+	fn read(&self, address: bits::u16) -> bits::u8 { self.deref().borrow().0.borrow().read(address) }
+	fn write(&mut self, address: bits::u16, value: bits::u8) { (**self).borrow_mut().0.borrow_mut().write(address, value) }
+	fn input(&mut self, port: u8) -> bits::u8 { (**self).borrow_mut().0.borrow_mut().input(port) }
+	fn output(&mut self, port: u8, value: bits::u8) { (**self).borrow_mut().0.borrow_mut().output(port, value) }
+}
 
 /// SimpleBoard is a minimal Harness designed to make it easy to start using the crate;
 /// it just stores a full 16k RAM space and byte arrays to store the input and output port values.
@@ -261,48 +260,55 @@ impl IndexMut<RangeFull> for SimpleBoard {
 /// accepts interrupt requests, including RST instructions. It can be used as an Iterator
 /// to do processing in between operations. It also forwards the contained Harness object
 /// out to receive method requests.
-pub struct Machine<H: Harness + ?Sized, B: BorrowMut<H>, C> {
+pub struct Machine<H: Harness + ?Sized, C: BorrowMut<H>> {
     chip: chip::State,
     board: C,
     _grammar: PhantomData<H>,
-    _referent: PhantomData<B>,
 }
 
-impl<H: Harness + ?Sized, B: BorrowMut<H>> Machine<H, B, B> {
+impl<H: Harness + ?Sized, C: BorrowMut<H>> Machine<H, C> {
+	pub fn new(board: C) -> Self {
+		Self { board, chip: chip::State::new(), _grammar: PhantomData::default() }
+	}
+
+//	fn cpu(&self) -> &chip::State { &self.chip }
+//	fn cpu_mut(&mut self) -> &mut chip::State { &mut self.chip }
+
+	fn split_mut(&mut self) -> (&mut chip::State, &mut H) { (&mut self.chip, self.board.borrow_mut() )}
+}
+
+impl<H: Harness + ?Sized, C: BorrowMut<H>> Deref for Machine<H, C> {
+	type Target = H;
+	fn deref(&self) -> &Self::Target { self.board.borrow() }
+}
+
+impl<H: Harness + ?Sized, C: BorrowMut<H>> DerefMut for Machine<H, C> {
+	fn deref_mut(&mut self) -> &mut Self::Target { self.board.borrow_mut() }
+}
+
+pub struct Install<H: Harness + ?Sized>(PhantomData<H>);
+
+impl<H: Harness + ?Sized> Install<H> {
     /// This associated function generates a new Machine using the provided Harness reference.
     /// It can accept any value that can be dereferenced to a mut Harness, whether dynamic or
     /// generic, making it fairly easy to supply a `&mut H`, a `Box<H>` or `Box<dyn Harness>`.
     ///
     /// >>> Future: Provide ways to use `RefCell<H>` or `Mutex<H>`.
-    pub fn new(what: B) -> Self {
-        Self { board: what, chip: chip::State::new(), _grammar: PhantomData::default(), _referent: PhantomData::default() }
+    pub fn new<C: BorrowMut<H>>(board: C) -> Machine<H, C> {
+        Machine::new( board )
+    }
+
+    pub fn new_shared<C: BorrowMut<H>>(board: C) -> Machine<Shared<H, C>, Shared<H, C>> {
+    	Machine::new(Rc::new(RefCell::new( (board, PhantomData::<H>::default()) )))
     }
 }
 
-impl<H: Harness + ?Sized, B: BorrowMut<H>> Borrow<H> for Machine<H, B, B> {
-    fn borrow(&self) -> &H { self.board.borrow() }
-}
-
-impl<H: Harness + ?Sized, B: BorrowMut<H>> BorrowMut<H> for Machine<H, B, B> {
-    fn borrow_mut(&mut self) -> &mut H { self.board.borrow_mut() }
-}
-
 #[cfg(feature="open")]
-impl<H: Harness + ?Sized, B: BorrowMut<H>, C> AsRef<chip::State> for Machine<H, B, C> {
-    fn as_ref(&self) -> &chip::State { &self.chip }
-}
-
-#[cfg(not(feature="open"))]
-impl<H: Harness + ?Sized, B: BorrowMut<H>, C> Machine<H, B, C> {
+impl<H: Harness + ?Sized, C: BorrowMut<H>> AsRef<chip::State> for Machine<H, C> {
     fn as_ref(&self) -> &chip::State { &self.chip }
 }
 
 #[cfg(feature="open")]
-impl<H: Harness + ?Sized, B: BorrowMut<H>, C> AsMut<chip::State> for Machine<H, B, C> {
-    fn as_mut(&mut self) -> &mut chip::State { &mut self.chip }
-}
-
-#[cfg(not(feature="open"))]
-impl<H: Harness + ?Sized, B: BorrowMut<H>, C> Machine<H, B, C> {
+impl<H: Harness + ?Sized, C: BorrowMut<H>> AsMut<chip::State> for Machine<H, C> {
     fn as_mut(&mut self) -> &mut chip::State { &mut self.chip }
 }

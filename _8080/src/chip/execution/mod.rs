@@ -10,10 +10,10 @@ pub(super) type OpOutcome = Result<Option<NonZeroU8>, crate::string::String>;
 #[cfg(not(feature="open"))]
 pub(super) type OpOutcome = Option<NonZeroU8>;
 
-impl<H: Harness + ?Sized, B: BorrowMut<H>> Machine<H, B, B> {
+impl<H: Harness + ?Sized, C: BorrowMut<H>> Machine<H, C> {
     fn from_pc(&self) -> impl Iterator<Item=raw::u8> + '_ {
         let mut start = self.chip.pc;
-        core::iter::from_fn(move || {let val = self.board.borrow().read(start).0; start += 1; Some(val)})
+        core::iter::from_fn(move || {let val = self.read(start).0; start += 1; Some(val)})
     }
 
     #[doc(hidden)]
@@ -23,12 +23,16 @@ impl<H: Harness + ?Sized, B: BorrowMut<H>> Machine<H, B, B> {
         let (op, len) = Op::extract(self.from_pc())
             .map_err(|e| panic!("Couldn't extract opcode from {e:X} at {:#06X}", self.chip.pc)).unwrap();
         self.chip.pc += len as raw::u16;
-        let outcome = op.execute_on(&mut self.chip, self.board.borrow_mut());
+        let outcome = {
+        	let (chip, bus) = self.split_mut();
+        	op.execute_on(chip, bus)
+        };
         if outcome.is_err() {
             self.chip.active = false;
         };
-        if let Some(action) = self.board.did_execute(&self.chip, op)? {
-            action.execute_on(&mut self.chip, self.board.borrow_mut()).unwrap();
+		let (chip, bus) = self.split_mut();
+        if let Some(action) = bus.did_execute(chip, op)? {
+            action.execute_on(chip, bus).unwrap();
             if action == Halt { return Ok(None); }
         }
         outcome
@@ -51,7 +55,10 @@ impl<H: Harness + ?Sized, B: BorrowMut<H>> Machine<H, B, B> {
         let (op, len) = Op::extract(self.from_pc())
             .map_err(|e| panic!("Couldn't extract opcode from {e:X?}")).unwrap();
         self.chip.pc += len as raw::u16;
-        let elapsed = op.execute_on(&mut self.chip, self.board.borrow_mut());
+        let elapsed = {
+        	let (chip, board) = self.split_mut();
+        	op.execute_on(chip, board)
+        };
         if elapsed.is_none() { self.chip.active = false; }
         elapsed
 	}
