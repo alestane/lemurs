@@ -144,15 +144,37 @@ pub trait Harness {
     fn as_any(&self) -> Option<&dyn any::Any> { None }
 }
 
+use crate::sync::{Arc, Mutex};
 use core::{borrow::BorrowMut, cell::RefCell, marker::PhantomData, ops::{Deref, DerefMut}};
 
 type Shared<H, C> = Rc<RefCell<(C, PhantomData<H>)>>;
 
 impl<H: Harness + ?Sized, C: BorrowMut<H>> Harness for Shared<H, C> {
 	fn read(&self, address: bits::u16) -> bits::u8 { self.deref().borrow().0.borrow().read(address) }
+	fn read_word(&self, address: bits::u16) -> bits::u16 { self.deref().borrow().0.borrow().read_word(address) }
 	fn write(&mut self, address: bits::u16, value: bits::u8) { (**self).borrow_mut().0.borrow_mut().write(address, value) }
+	fn write_word(&mut self, address: bits::u16, value: bits::u16) { (**self).borrow_mut().0.borrow_mut().write_word(address, value) }
 	fn input(&mut self, port: u8) -> bits::u8 { (**self).borrow_mut().0.borrow_mut().input(port) }
 	fn output(&mut self, port: u8, value: bits::u8) { (**self).borrow_mut().0.borrow_mut().output(port, value) }
+	#[cfg(feature="cfg")]
+	fn did_execute(&mut self, client: &chip::State, did: chip::opcode::Op) -> Result<Option<chip::opcode::Op>, string::String> {
+		(**self).borrow_mut().0.borrow_mut().did_execute(client, did)
+	}
+}
+
+type Synced<H, C> = Arc<Mutex<(C, PhantomData<H>)>>;
+
+impl<H: Harness + ?Sized, C: BorrowMut<H>> Harness for Synced<H, C> {
+	fn read(&self, address: bits::u16) -> bits::u8 { self.deref().lock().unwrap().0.borrow().read(address) }
+	fn read_word(&self, address: bits::u16) -> bits::u16 { self.deref().lock().unwrap().0.borrow().read_word(address) }
+	fn write(&mut self, address: bits::u16, value: bits::u8) { (**self).lock().unwrap().0.borrow_mut().write(address, value) }
+	fn write_word(&mut self, address: bits::u16, value: bits::u16) { (**self).lock().unwrap().0.borrow_mut().write_word(address, value) }
+	fn input(&mut self, port: u8) -> bits::u8 { (**self).lock().unwrap().0.borrow_mut().input(port) }
+	fn output(&mut self, port: u8, value: bits::u8) { (**self).lock().unwrap().0.borrow_mut().output(port, value) }
+	#[cfg(feature="cfg")]
+	fn did_execute(&mut self, client: &chip::State, did: chip::opcode::Op) -> Result<Option<chip::opcode::Op>, string::String> {
+		(**self).lock().unwrap().0.borrow_mut().did_execute(client, did)
+	}
 }
 
 /// SimpleBoard is a minimal Harness designed to make it easy to start using the crate;
@@ -207,7 +229,11 @@ impl<H: Harness + ?Sized> Install<H> {
     }
 
     pub fn new_shared<C: BorrowMut<H>>(board: C) -> Machine<Shared<H, C>, Shared<H, C>> {
-    	Machine::new(Rc::new(RefCell::new( (board, PhantomData::<H>::default()) )))
+    	Machine::new(Rc::new(RefCell::new( (board, PhantomData::default()) )))
+    }
+
+    pub fn new_synced<C: BorrowMut<H>>(board: C) -> Machine<Synced<H, C>, Synced<H, C>> {
+    	Machine::new(Arc::new(Mutex::new( (board, PhantomData::default()) )))
     }
 }
 
