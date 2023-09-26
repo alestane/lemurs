@@ -144,6 +144,7 @@ pub trait Harness {
     fn as_any(&self) -> Option<&dyn any::Any> { None }
 }
 
+#[cfg(feature="std")]
 use crate::sync::{Arc, Mutex};
 use core::{borrow::BorrowMut, cell::RefCell, marker::PhantomData, ops::{Deref, DerefMut}};
 
@@ -162,8 +163,10 @@ impl<H: Harness + ?Sized, C: BorrowMut<H>> Harness for Shared<H, C> {
 	}
 }
 
+#[cfg(feature="std")]
 type Synced<H, C> = Arc<Mutex<(C, PhantomData<H>)>>;
 
+#[cfg(feature="std")]
 impl<H: Harness + ?Sized, C: BorrowMut<H>> Harness for Synced<H, C> {
 	fn read(&self, address: bits::u16) -> bits::u8 { self.deref().lock().unwrap().0.borrow().read(address) }
 	fn read_word(&self, address: bits::u16) -> bits::u16 { self.deref().lock().unwrap().0.borrow().read_word(address) }
@@ -207,6 +210,18 @@ impl<H: Harness + ?Sized, C: BorrowMut<H>> Machine<H, C> {
 	fn split_mut(&mut self) -> (&mut chip::State, &mut H) { (&mut self.chip, self.board.borrow_mut() )}
 }
 
+/// Machines based on a Shared (`Rc<RefCell<H>>`) or Synced (`Arc<Mutex<H>>`) model can 
+/// provide a new Machine using the same shared Harness but a new State, crudely emulating 
+/// multiprocessing.
+impl<H: Harness + ?Sized, C: BorrowMut<H>> Machine<Shared<H, C>, Shared<H, C>> {
+    pub fn fork(&self) -> Self { Self::new(self.board.clone()) }
+}
+
+#[cfg(feature="std")]
+impl<H: Harness + ?Sized, C: BorrowMut<H>> Machine<Synced<H, C>, Synced<H, C>> {
+    pub fn fork(&self) -> Self { Self::new(self.board.clone()) }
+}
+
 impl<H: Harness + ?Sized, C: BorrowMut<H>> Deref for Machine<H, C> {
 	type Target = H;
 	fn deref(&self) -> &Self::Target { self.board.borrow() }
@@ -222,16 +237,22 @@ impl<H: Harness + ?Sized> Install<H> {
     /// This associated function generates a new Machine using the provided Harness reference.
     /// It can accept any value that can be dereferenced to a mut Harness, whether dynamic or
     /// generic, making it fairly easy to supply a `&mut H`, a `Box<H>` or `Box<dyn Harness>`.
-    ///
-    /// >>> Future: Provide ways to use `RefCell<H>` or `Mutex<H>`.
     pub fn new<C: BorrowMut<H>>(board: C) -> Machine<H, C> {
         Machine::new( board )
     }
 
+    /// This associated function takes a standard single Harness access point (which could 
+    /// be an embedded value) and generates a new Machine that uses a shared copy of that 
+    /// access point, using Rc<RefCell<H>> to gate access (this means it is not thread-safe).
     pub fn new_shared<C: BorrowMut<H>>(board: C) -> Machine<Shared<H, C>, Shared<H, C>> {
     	Machine::new(Rc::new(RefCell::new( (board, PhantomData::default()) )))
     }
 
+    /// This associated function takes a standard single Harness access point (which could 
+    /// be an embedded value) and generates a new Machine that uses a shared copy of that 
+    /// access point, using Arc<Mutex<H>> to gate access (Use this one if you want to 
+    /// execute multiple CPUs on separate threads).
+    #[cfg(feature="std")]
     pub fn new_synced<C: BorrowMut<H>>(board: C) -> Machine<Synced<H, C>, Synced<H, C>> {
     	Machine::new(Arc::new(Mutex::new( (board, PhantomData::default()) )))
     }

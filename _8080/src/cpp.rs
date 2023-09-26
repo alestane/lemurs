@@ -4,7 +4,7 @@ extern crate cpp;
 use crate::boxed::Box;
 use crate::chip::opcode::Op;
 
-use core::{marker::PhantomData, num::Wrapping, ops::{Deref, DerefMut}};
+use core::{borrow::{Borrow, BorrowMut}, marker::PhantomData, num::Wrapping};
 
 #[repr(C)]
 struct Harness (u8, PhantomData<dyn crate::Harness>);
@@ -23,17 +23,16 @@ mod safe {
             Self::Owned(Box::new(container))
         }
     }
-    impl Deref for FreePtr {
-        type Target = dyn crate::Harness;
-        fn deref(&self) -> &Self::Target {
+    impl Borrow<dyn crate::Harness> for FreePtr {
+        fn borrow(&self) -> &(dyn crate::Harness + 'static) {
             match self {
                 Self::External(ptr) => unsafe { &**ptr },
                 Self::Owned(ref ptr) => &**ptr, 
             }
         }
     }
-    impl DerefMut for FreePtr {
-        fn deref_mut(&mut self) -> &mut Self::Target {
+    impl BorrowMut<dyn crate::Harness> for FreePtr {
+        fn borrow_mut(&mut self) -> &mut (dyn crate::Harness + 'static) {
             match self {
                 Self::External(ptr) => unsafe { &mut **ptr },
                 Self::Owned(ref mut ptr) => &mut **ptr, 
