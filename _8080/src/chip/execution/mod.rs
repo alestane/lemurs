@@ -90,7 +90,7 @@ impl<H: Harness + ?Sized, C: BorrowMut<H>> Machine<H, C> {
     /// and jumping to one of the addresses 0x00, 0x80, 0x10, 0x18, 0x20, 0x28, 0x30, 0x38, 0x40 or 0x48.
     pub fn reset_to(&mut self, index: usize) -> Result<bool, opcode::OutOfRange> {
         match index {
-            0..8 => Ok(self.interrupt(Reset{vector: index as raw::u8}).ok().unwrap()),
+            0..=7 => Ok(self.interrupt(Reset{vector: index as raw::u8}).ok().unwrap()),
             _ => Err(opcode::OutOfRange)
         }
     }

@@ -25,10 +25,6 @@
 //! several debug features so that you can examine what is happening with the execution directly.
 
 #![no_std]
-#![feature(split_array)]
-#![feature(exclusive_range_pattern)]
-#![feature(trait_alias)]
-#![feature(iter_intersperse)]
 #![feature(generic_arg_infer)]
 #![feature(error_in_core)]
 

@@ -10,6 +10,7 @@ fn compile<F : FnOnce(&mut Build)> (file: PathBuf, process: Option<F>) -> Result
 		let mut job = Build::new();
 		job
 			.cpp(true)
+			.std("c++14")
 			.file(file.clone())
 	    	.include("include");
 		#[cfg(feature="open")]
