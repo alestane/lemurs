@@ -1,6 +1,6 @@
 #![feature(path_file_prefix)]
 
-use std::{fs, path::{Path, PathBuf}};
+use std::path::PathBuf;
 use cc::Build;
 
 #[allow(dead_code)]
