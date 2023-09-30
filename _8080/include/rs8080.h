@@ -47,8 +47,8 @@ namespace i8080 {
 
 		byte read(word address) const override { return ram[address]; }
 		void write(word address, byte value) override { ram[address] = value; }
-		byte input(byte port) { return inputs[port]; }
-		void output(byte port, byte value) { outputs[port] = value; }
+		byte input(byte port) override { return inputs[port]; }
+		void output(byte port, byte value) override { outputs[port] = value; }
 	};
 
 	class machine {
