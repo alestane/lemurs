@@ -12,11 +12,11 @@ struct Harness (u8, PhantomData<dyn crate::Harness>);
 mod safe {
     use super::*;
     pub (super) enum FreePtr {
-        External(*mut dyn crate::Harness),
+        External(*mut Harness),
         Owned(Box<dyn crate::Harness>),
     }
     impl FreePtr {
-        pub fn new_unowned(reference: &mut (dyn crate::Harness + 'static)) -> Self {
+        pub fn new_unowned(reference: &mut Harness) -> Self {
             Self::External(reference as *mut _)
         }
         pub fn new_owned(container: impl crate::Harness + 'static) -> Self {

@@ -34,9 +34,7 @@ namespace i8080 {
 		virtual void write_word(word address, word value) { write(address, value & 0xFF); write(address + 1, value >> 8); }
 		virtual byte input(byte port) = 0;
 		virtual void output(byte port, byte value) = 0;
-		#ifdef _8080_INTERNALS
 		virtual const byte* did_execute(const state& chip, byte op[4]) { return nullptr; }
-		#endif
 	};
 
 	class simple_board : public board {
