@@ -34,7 +34,7 @@ namespace i8080 {
 		virtual void write_word(word address, word value) { write(address, value & 0xFF); write(address + 1, value >> 8); }
 		virtual byte input(byte port) = 0;
 		virtual void output(byte port, byte value) = 0;
-		virtual const byte* did_execute(const state& chip, byte op[4]) { return nullptr; }
+		virtual const byte* did_execute(const state&, byte[4]) { return nullptr; }
 	};
 
 	class simple_board : public board {

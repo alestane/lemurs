@@ -16,10 +16,10 @@ extern "C" {
 
 	void discard_machine(machine* host);
 
-	const i8080::state& machine_state(const machine& host);
+	const i8080::state* machine_state(const machine& host);
 }
 
-extern "C" byte read_harness(const board& host, word address) 
+extern "C" byte read_harness(const board& host, word address)
 {
 	return host.read(address);
 }
@@ -55,9 +55,9 @@ extern "C" const byte* did_execute_harness(board& host, const i8080::state& chip
 }
 
 namespace i8080 {
- 	void machine::deleter::operator()(machine* it) const { discard_machine(it); } 
+ 	void machine::deleter::operator()(machine* it) const { discard_machine(it); }
 
-	machine::owner machine::install(board* host) 
+	machine::owner machine::install(board* host)
 	{
 		return machine::owner{create_machine(host)};
 	}
@@ -67,18 +67,18 @@ namespace i8080 {
 		return request_default_impl(*this);
 	}
 
-	byte machine::execute() & 
+	byte machine::execute() &
 	{
 		return machine_execute(*this);
 	}
 
-	bool machine::interrupt(byte code) & 
+	bool machine::interrupt(byte code) &
 	{
 		return machine_interrupt(*this, code);
 	}
 
-	const state& machine::operator*() const 
+	const state& machine::operator*() const
 	{
-		return machine_state(*this);
+		return *machine_state(*this);
 	}
 }

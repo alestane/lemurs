@@ -27,7 +27,7 @@ mod safe {
         fn borrow(&self) -> &(dyn crate::Harness + 'static) {
             match self {
                 Self::External(ptr) => unsafe { &**ptr },
-                Self::Owned(ref ptr) => &**ptr, 
+                Self::Owned(ref ptr) => &**ptr,
             }
         }
     }
@@ -35,7 +35,7 @@ mod safe {
         fn borrow_mut(&mut self) -> &mut (dyn crate::Harness + 'static) {
             match self {
                 Self::External(ptr) => unsafe { &mut **ptr },
-                Self::Owned(ref mut ptr) => &mut **ptr, 
+                Self::Owned(ref mut ptr) => &mut **ptr,
             }
         }
     }
@@ -57,8 +57,7 @@ extern "C" fn request_default_impl(host: &Machine) -> Option<&crate::SimpleBoard
 }
 
 #[no_mangle]
-#[cfg(feature="open")]
-extern "C" fn machine_state(host: &Machine) -> &crate::State {
+extern "C" fn machine_state(host: &Machine) -> &crate::chip::State {
     host.as_ref()
 }
 

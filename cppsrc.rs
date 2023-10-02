@@ -13,8 +13,6 @@ fn compile<F : FnOnce(&mut Build)> (file: PathBuf, process: Option<F>) -> Result
 			.std("c++14")
 			.file(file.clone())
 	    	.include("include");
-		#[cfg(feature="open")]
-		job.define("_8080_INTERNALS", "open");
 		if let Some(process) = process {
 			process(&mut job);
 		}
@@ -39,7 +37,7 @@ fn main() {
 		std::fs::read_dir("src").map(
 			|dir| {
 				for source in dir.flatten() {
-					let _ = compile(source.path(), debug);		
+					let _ = compile(source.path(), debug);
 				}
 			}
 		).ok();

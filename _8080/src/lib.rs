@@ -206,8 +206,8 @@ impl<H: Harness + ?Sized, C: BorrowMut<H>> Machine<H, C> {
 	fn split_mut(&mut self) -> (&mut chip::State, &mut H) { (&mut self.chip, self.board.borrow_mut() )}
 }
 
-/// Machines based on a Shared (`Rc<RefCell<H>>`) or Synced (`Arc<Mutex<H>>`) model can 
-/// provide a new Machine using the same shared Harness but a new State, crudely emulating 
+/// Machines based on a Shared (`Rc<RefCell<H>>`) or Synced (`Arc<Mutex<H>>`) model can
+/// provide a new Machine using the same shared Harness but a new State, crudely emulating
 /// multiprocessing.
 impl<H: Harness + ?Sized, C: BorrowMut<H>> Machine<Shared<H, C>, Shared<H, C>> {
     pub fn fork(&self) -> Self { Self::new(self.board.clone()) }
@@ -237,16 +237,16 @@ impl<H: Harness + ?Sized> Install<H> {
         Machine::new( board )
     }
 
-    /// This associated function takes a standard single Harness access point (which could 
-    /// be an embedded value) and generates a new Machine that uses a shared copy of that 
+    /// This associated function takes a standard single Harness access point (which could
+    /// be an embedded value) and generates a new Machine that uses a shared copy of that
     /// access point, using Rc<RefCell<H>> to gate access (this means it is not thread-safe).
     pub fn new_shared<C: BorrowMut<H>>(board: C) -> Machine<Shared<H, C>, Shared<H, C>> {
     	Machine::new(Rc::new(RefCell::new( (board, PhantomData::default()) )))
     }
 
-    /// This associated function takes a standard single Harness access point (which could 
-    /// be an embedded value) and generates a new Machine that uses a shared copy of that 
-    /// access point, using Arc<Mutex<H>> to gate access (Use this one if you want to 
+    /// This associated function takes a standard single Harness access point (which could
+    /// be an embedded value) and generates a new Machine that uses a shared copy of that
+    /// access point, using Arc<Mutex<H>> to gate access (Use this one if you want to
     /// execute multiple CPUs on separate threads).
     #[cfg(feature="std")]
     pub fn new_synced<C: BorrowMut<H>>(board: C) -> Machine<Synced<H, C>, Synced<H, C>> {
@@ -254,12 +254,22 @@ impl<H: Harness + ?Sized> Install<H> {
     }
 }
 
+#[allow(dead_code)]
+impl<H: Harness + ?Sized, C: BorrowMut<H>> Machine<H, C> {
+    fn as_ref(&self) -> &chip::State { &self.chip }
+}
+
+#[allow(dead_code)]
+impl<H: Harness + ?Sized, C: BorrowMut<H>> Machine<H, C> {
+    fn as_mut(&mut self) -> &mut chip::State { &mut self.chip }
+}
+
 #[cfg(feature="open")]
 impl<H: Harness + ?Sized, C: BorrowMut<H>> AsRef<chip::State> for Machine<H, C> {
-    fn as_ref(&self) -> &chip::State { &self.chip }
+    fn as_ref(&self) -> &chip::State { self.as_ref() }
 }
 
 #[cfg(feature="open")]
 impl<H: Harness + ?Sized, C: BorrowMut<H>> AsMut<chip::State> for Machine<H, C> {
-    fn as_mut(&mut self) -> &mut chip::State { &mut self.chip }
+    fn as_mut(&mut self) -> &mut chip::State { self.as_mut() }
 }
