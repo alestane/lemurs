@@ -4,9 +4,9 @@ This package provides an emulator for the Intel 8080 microprocessor. It models o
 
 The package supports compiling without the "std" feature to remove dependencies on the std crate. This will require supplying a replacement panic handler and allocator.
 
-You can use the script below to build a static library that can be used in C++ projects, which will produce a folder called `lemurs_8080_cpp` in the current directory containing a header file and both debug and release versions of the library:
+You can use the scripts below to build a static library that can be used in C++ projects, which will produce a folder called `lemurs_8080_cpp` in the current directory containing a header file and both debug and release versions of the library:
 
-### Linux/Mac OS X/ other POSIX
+### bash (Linux/Mac OS X/ other POSIX)
 ```bash
 #!/bin/bash
 mkdir lemurs_8080_cpp; cd lemurs_8080_cpp; L8080=$(pwd); mkdir debug release
@@ -20,6 +20,26 @@ cargo new --vcs none build_8080_cpp
 		--out-dir "${L8080}/release" --release
 )
 rm -r build_8080_cpp
+```
+
+### PowerShell (Windows)
+```powershell
+mkdir 'lemurs_8080_cpp'
+Set-Location .\lemurs_8080_cpp
+Push-Location
+'debug','release' | ForEach-Object {mkdir ".\$_"}
+cargo new --vcs none build_8080_cpp
+Set-Location build_8080_cpp
+cargo add lemurs-8080
+cargo vendor
+Set-Location vendor\lemurs-8080
+Copy-Item -Path .\include -Destination (Get-Location -Stack) -Recurse
+
+cargo +nightly -Z unstable-options build --no-default-features --features "cpp" --out-dir "$(Get-Location -Stack)\debug"
+cargo +nightly -Z unstable-options build --no-default-features --features "cpp" --out-dir "$(Get-Location -Stack)\release" --release
+
+Pop-Location
+Remove-Item -Recurse -Path build_8080_cpp
 ```
 
 Lemurs is intended to be a collection of chip emulation packages. Currently only the i8080 is supported.
