@@ -1,19 +1,19 @@
-use core::{num::{NonZeroU8, Wrapping}, borrow::BorrowMut, ops::DerefMut};
-use crate::{raw, bits::*, Machine, Harness};
-use super::{State, access::{*, Register::*, Byte::*, Double::*, Internal::*, Word::*}};
+use crate::prelude::*;
+use core::num::NonZeroU8;
+use super::access::{*, Register::*, Byte::*, Double::*, Internal::*, Word::*};
 
 pub mod opcode;
 use opcode::{Op, Op::*};
 
 #[cfg(feature="open")]
-pub(super) type OpOutcome = Result<Option<NonZeroU8>, crate::string::String>;
+pub(super) type OpOutcome = Result<Option<NonZeroU8>, String>;
 #[cfg(not(feature="open"))]
 pub(super) type OpOutcome = Option<NonZeroU8>;
 
 impl<H: Harness + ?Sized, C: BorrowMut<H>> Machine<H, C> {
-    fn from_pc(&self) -> impl Iterator<Item=raw::u8> + '_ {
+    fn from_pc(&self) -> impl Iterator<Item=u8> + '_ {
         let mut start = self.chip.pc;
-        core::iter::from_fn(move || {let val = self.read(start).0; start += 1; Some(val)})
+        core::iter::from_fn(move || {let val = self.read(start).0; start += 1; Some(Wrapping(val))})
     }
 
     #[doc(hidden)]

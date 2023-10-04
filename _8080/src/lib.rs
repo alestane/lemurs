@@ -34,19 +34,22 @@ extern crate disclose;
 #[cfg(feature="std")]
 mod foundation {
     extern crate std;
-    pub use std::{any, array, borrow, boxed, convert, num, ops, rc, result, slice, string, sync, vec};
+    pub use std::{any, array, borrow, boxed, convert, fmt, num, ops, rc, result, slice, string, sync, vec};
 }
 #[cfg(not(feature="std"))]
 mod foundation {
     extern crate alloc;
     pub use alloc::{boxed, rc, string, vec};
-    pub use core::{array, borrow, convert, num, result, ops, slice, any};
+    pub use core::{array, borrow, convert, fmt, num, result, ops, slice, any};
 }
-use foundation::num::Wrapping;
-use foundation::*;
-#[allow(unused_imports)]
-use self::boxed::Box;
-use self::rc::Rc;
+
+#[cfg_attr(feature="open", disclose)]
+mod prelude {
+    pub use super::{foundation::*, Harness, Machine, chip::State};
+    pub(crate) use super::{raw, bits::{u8, u16}};
+    pub use self::{boxed::Box, num::Wrapping, string::String, borrow::{Borrow, BorrowMut}, ops::{Deref, DerefMut, Index, IndexMut}};
+}
+use self::{prelude::*, rc::Rc};
 
 mod chip;
 
@@ -68,14 +71,16 @@ mod bits {
 }
 
 #[cfg(any(feature="open", doc))]
-pub use chip::State;
-
-#[cfg(any(feature="open", doc))]
-pub mod internal {
+mod internal {
     use super::*;
+    pub use chip::State;
     pub use chip::access::*;
+    pub use crate::chip::opcode as op;
     pub use crate::chip::opcode::{Op::{self, *}, Flag::*, Test::*};
 }
+
+#[cfg(any(feature="open", doc))]
+pub use internal::*;
 
 /// The Harness trait is the core of using this package; the `Machine` struct will use a
 /// type of your choosing that the chip can use to read 8-bit or 16-bit values from 16-bit
@@ -87,7 +92,7 @@ pub trait Harness {
     ///
     /// This method returns the 8-bit value associated with the supplied 16-bit memory
     /// address. It should generally be consistent with any writes made to the same address.
-    fn read(&self, from: bits::u16) -> bits::u8;
+    fn read(&self, from: u16) -> u8;
 
     /// This is a convenience method; it takes care of reading a 16-bit word in little-endian
     /// format from the specified address (less-signficant byte) and the subsequent address
@@ -97,14 +102,14 @@ pub trait Harness {
     /// on two consecutive addresses and concatenating them together. You can implement this
     /// to provide an optimized read operation, such as if your memory values are stored in a
     /// byte slice and you can just read adjacent indices.
-    fn read_word(&self, from: bits::u16) -> bits::u16 {
-        Wrapping(u16::from_le_bytes([self.read(from).0, self.read(from + Wrapping(1)).0]))
+    fn read_word(&self, from: u16) -> u16 {
+        Wrapping(raw::u16::from_le_bytes([self.read(from).0, self.read(from + Wrapping(1)).0]))
     }
 
     /// This method takes care of writing a byte to the specified address. It defaults to
     /// silently discarding the supplied byte, for emulating read-only memory, but you will
     /// usually want to supply your own implementation to record at least some variables.
-    fn write(&mut self, to: bits::u16, value: bits::u8) { let _ = (value, to); }
+    fn write(&mut self, to: u16, value: u8) { let _ = (value, to); }
 
     /// This is a convenience method; it takes care of writing a 16-bit word in little-endian
     /// format to the specified address (less-signficant byte) and the subsequent address
@@ -114,26 +119,26 @@ pub trait Harness {
     /// on two consecutive addresses from the two bytes in the argument. You can implement this
     /// to provide an optimized write operation, such as if your memory values are stored in a
     /// byte slice and you can just write adjacent indices.
-    fn write_word(&mut self, to: bits::u16, value: bits::u16) {
+    fn write_word(&mut self, to: u16, value: u16) {
         for (index, byte) in value.0.to_le_bytes().into_iter().enumerate() {
-            self.write(to + num::Wrapping(index as u16), num::Wrapping(byte))
+            self.write(to + Wrapping(index as raw::u16), Wrapping(byte))
         }
     }
 
     /// This method handles input operations. The CPU core can request/accept inputs on any
     /// 8-bit port number. What values are supplied via what ports is entirely application-specific.
-	fn input(&mut self, port: u8) -> bits::u8;
+	fn input(&mut self, port: raw::u8) -> u8;
 
     /// This method handles output operations. The CPU core can publish/transmit outputs on any
     /// 8-bit port number. What values are carried via what ports is entirely application-specific.
-    fn output(&mut self, port: u8, value: bits::u8);
+    fn output(&mut self, port: raw::u8, value: u8);
 
 
     /// This method reports to the Harness after every operation executed by the CPU, detailing the
     /// operation executed and providing access to the current state of the CPU's internal registers
     /// and flags.
     #[cfg(any(feature="open", doc))]
-    fn did_execute(&mut self, client: &chip::State, did: chip::opcode::Op) -> Result<Option<chip::opcode::Op>, string::String> { let _ = (client, did); Ok( None ) }
+    fn did_execute(&mut self, client: &chip::State, did: chip::opcode::Op) -> Result<Option<chip::opcode::Op>, String> { let _ = (client, did); Ok( None ) }
 
     /// You don't usually need to implement this method; it enables downcasting in cases where a
     /// Machine stores a `dyn Harness` trait object.
@@ -147,12 +152,12 @@ use core::{borrow::BorrowMut, cell::RefCell, marker::PhantomData, ops::{Deref, D
 type Shared<H, C> = Rc<RefCell<(C, PhantomData<H>)>>;
 
 impl<H: Harness + ?Sized, C: BorrowMut<H>> Harness for Shared<H, C> {
-	fn read(&self, address: bits::u16) -> bits::u8 { self.deref().borrow().0.borrow().read(address) }
-	fn read_word(&self, address: bits::u16) -> bits::u16 { self.deref().borrow().0.borrow().read_word(address) }
-	fn write(&mut self, address: bits::u16, value: bits::u8) { (**self).borrow_mut().0.borrow_mut().write(address, value) }
-	fn write_word(&mut self, address: bits::u16, value: bits::u16) { (**self).borrow_mut().0.borrow_mut().write_word(address, value) }
-	fn input(&mut self, port: u8) -> bits::u8 { (**self).borrow_mut().0.borrow_mut().input(port) }
-	fn output(&mut self, port: u8, value: bits::u8) { (**self).borrow_mut().0.borrow_mut().output(port, value) }
+	fn read(&self, address: u16) -> u8 { self.deref().borrow().0.borrow().read(address) }
+	fn read_word(&self, address: u16) -> u16 { self.deref().borrow().0.borrow().read_word(address) }
+	fn write(&mut self, address: u16, value: u8) { (**self).borrow_mut().0.borrow_mut().write(address, value) }
+	fn write_word(&mut self, address: u16, value: u16) { (**self).borrow_mut().0.borrow_mut().write_word(address, value) }
+	fn input(&mut self, port: raw::u8) -> u8 { (**self).borrow_mut().0.borrow_mut().input(port) }
+	fn output(&mut self, port: raw::u8, value: u8) { (**self).borrow_mut().0.borrow_mut().output(port, value) }
 	#[cfg(feature="cfg")]
 	fn did_execute(&mut self, client: &chip::State, did: chip::opcode::Op) -> Result<Option<chip::opcode::Op>, string::String> {
 		(**self).borrow_mut().0.borrow_mut().did_execute(client, did)
@@ -164,12 +169,12 @@ type Synced<H, C> = Arc<Mutex<(C, PhantomData<H>)>>;
 
 #[cfg(feature="std")]
 impl<H: Harness + ?Sized, C: BorrowMut<H>> Harness for Synced<H, C> {
-	fn read(&self, address: bits::u16) -> bits::u8 { self.deref().lock().unwrap().0.borrow().read(address) }
-	fn read_word(&self, address: bits::u16) -> bits::u16 { self.deref().lock().unwrap().0.borrow().read_word(address) }
-	fn write(&mut self, address: bits::u16, value: bits::u8) { (**self).lock().unwrap().0.borrow_mut().write(address, value) }
-	fn write_word(&mut self, address: bits::u16, value: bits::u16) { (**self).lock().unwrap().0.borrow_mut().write_word(address, value) }
-	fn input(&mut self, port: u8) -> bits::u8 { (**self).lock().unwrap().0.borrow_mut().input(port) }
-	fn output(&mut self, port: u8, value: bits::u8) { (**self).lock().unwrap().0.borrow_mut().output(port, value) }
+	fn read(&self, address: u16) -> u8 { self.deref().lock().unwrap().0.borrow().read(address) }
+	fn read_word(&self, address: u16) -> u16 { self.deref().lock().unwrap().0.borrow().read_word(address) }
+	fn write(&mut self, address: u16, value: u8) { (**self).lock().unwrap().0.borrow_mut().write(address, value) }
+	fn write_word(&mut self, address: u16, value: u16) { (**self).lock().unwrap().0.borrow_mut().write_word(address, value) }
+	fn input(&mut self, port: raw::u8) -> u8 { (**self).lock().unwrap().0.borrow_mut().input(port) }
+	fn output(&mut self, port: raw::u8, value: u8) { (**self).lock().unwrap().0.borrow_mut().output(port, value) }
 	#[cfg(feature="cfg")]
 	fn did_execute(&mut self, client: &chip::State, did: chip::opcode::Op) -> Result<Option<chip::opcode::Op>, string::String> {
 		(**self).lock().unwrap().0.borrow_mut().did_execute(client, did)
@@ -206,8 +211,8 @@ impl<H: Harness + ?Sized, C: BorrowMut<H>> Machine<H, C> {
 	fn split_mut(&mut self) -> (&mut chip::State, &mut H) { (&mut self.chip, self.board.borrow_mut() )}
 }
 
-/// Machines based on a Shared (`Rc<RefCell<H>>`) or Synced (`Arc<Mutex<H>>`) model can
-/// provide a new Machine using the same shared Harness but a new State, crudely emulating
+/// Machines based on a Shared (`Rc<RefCell<H>>`) or Synced (`Arc<Mutex<H>>`) model can 
+/// provide a new Machine using the same shared Harness but a new State, crudely emulating 
 /// multiprocessing.
 impl<H: Harness + ?Sized, C: BorrowMut<H>> Machine<Shared<H, C>, Shared<H, C>> {
     pub fn fork(&self) -> Self { Self::new(self.board.clone()) }
@@ -237,16 +242,16 @@ impl<H: Harness + ?Sized> Install<H> {
         Machine::new( board )
     }
 
-    /// This associated function takes a standard single Harness access point (which could
-    /// be an embedded value) and generates a new Machine that uses a shared copy of that
+    /// This associated function takes a standard single Harness access point (which could 
+    /// be an embedded value) and generates a new Machine that uses a shared copy of that 
     /// access point, using Rc<RefCell<H>> to gate access (this means it is not thread-safe).
     pub fn new_shared<C: BorrowMut<H>>(board: C) -> Machine<Shared<H, C>, Shared<H, C>> {
     	Machine::new(Rc::new(RefCell::new( (board, PhantomData::default()) )))
     }
 
-    /// This associated function takes a standard single Harness access point (which could
-    /// be an embedded value) and generates a new Machine that uses a shared copy of that
-    /// access point, using Arc<Mutex<H>> to gate access (Use this one if you want to
+    /// This associated function takes a standard single Harness access point (which could 
+    /// be an embedded value) and generates a new Machine that uses a shared copy of that 
+    /// access point, using Arc<Mutex<H>> to gate access (Use this one if you want to 
     /// execute multiple CPUs on separate threads).
     #[cfg(feature="std")]
     pub fn new_synced<C: BorrowMut<H>>(board: C) -> Machine<Synced<H, C>, Synced<H, C>> {
@@ -257,10 +262,6 @@ impl<H: Harness + ?Sized> Install<H> {
 #[allow(dead_code)]
 impl<H: Harness + ?Sized, C: BorrowMut<H>> Machine<H, C> {
     fn as_ref(&self) -> &chip::State { &self.chip }
-}
-
-#[allow(dead_code)]
-impl<H: Harness + ?Sized, C: BorrowMut<H>> Machine<H, C> {
     fn as_mut(&mut self) -> &mut chip::State { &mut self.chip }
 }
 

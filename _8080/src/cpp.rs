@@ -1,10 +1,9 @@
 #[cfg(not(test))]
 extern crate cpp;
 
-use crate::boxed::Box;
-use crate::chip::opcode::Op;
+use crate::{prelude::*, Op};
 
-use core::{borrow::{Borrow, BorrowMut}, marker::PhantomData, num::Wrapping};
+use core::marker::PhantomData;
 
 #[repr(C)]
 struct Harness (u8, PhantomData<dyn crate::Harness>);
@@ -57,7 +56,8 @@ extern "C" fn request_default_impl(host: &Machine) -> Option<&crate::SimpleBoard
 }
 
 #[no_mangle]
-extern "C" fn machine_state(host: &Machine) -> &crate::chip::State {
+#[cfg(feature="open")]
+extern "C" fn machine_state(host: &Machine) -> &State {
     host.as_ref()
 }
 
@@ -73,11 +73,11 @@ extern "C-unwind" fn machine_execute(host: &mut Machine) -> u8 {
 #[no_mangle]
 #[cfg(feature="open")]
 extern "C-unwind" fn machine_execute(host: &mut Machine) -> u8 {
-    match host.execute() {
+    Wrapping(match host.execute() {
         Ok(None) => 0,
         Ok(Some(byte)) => byte.get(),
         Err(string) => panic!("{string}"),
-    }
+    })
 }
 
 #[no_mangle]
@@ -91,42 +91,42 @@ extern "C" fn discard_machine(state: *mut Machine) {
 }
 
 extern "C-unwind" {
-    fn read_harness(host: &Harness, address: Wrapping<u16>) -> Wrapping<u8>;
-    fn read_word_harness(host: &Harness, address: Wrapping<u16>) -> Wrapping<u16>;
-    fn write_harness(host: &mut Harness, address: Wrapping<u16>, value: Wrapping<u8>);
-    fn write_word_harness(host: &mut Harness, address: Wrapping<u16>, value: Wrapping<u16>);
-    fn input_harness(host: &Harness, port: u8) -> Wrapping<u8>;
-    fn output_harness(host: &mut Harness, port: u8, value: Wrapping<u8>);
+    fn read_harness(host: &Harness, address: u16) -> u8;
+    fn read_word_harness(host: &Harness, address: u16) -> u16;
+    fn write_harness(host: &mut Harness, address: u16, value: u8);
+    fn write_word_harness(host: &mut Harness, address: u16, value: u16);
+    fn input_harness(host: &Harness, port: raw::u8) -> u8;
+    fn output_harness(host: &mut Harness, port: raw::u8, value: u8);
     #[cfg(feature="open")]
     fn did_execute_harness(host: &mut Harness, chip: &crate::State, op: u32) -> Option<&'static [u8;4]>;
 }
 
 impl crate::Harness for Harness {
-    fn read(&self, from: Wrapping<u16>) -> Wrapping<u8> {
+    fn read(&self, from: u16) -> u8 {
         unsafe { read_harness(self, from) }
     }
-    fn read_word(&self, from: Wrapping<u16>) -> Wrapping<u16> {
+    fn read_word(&self, from: u16) -> u16 {
         unsafe { read_word_harness(self, from) }
     }
-    fn write(&mut self, to: Wrapping<u16>, value: Wrapping<u8>) {
+    fn write(&mut self, to: u16, value: u8) {
         unsafe { write_harness(self, to, value) }
     }
-    fn write_word(&mut self, to: Wrapping<u16>, value: Wrapping<u16>) {
+    fn write_word(&mut self, to: u16, value: u16) {
         unsafe { write_word_harness(self, to, value) }
     }
-    fn input(&mut self, port: u8) -> Wrapping<u8> {
+    fn input(&mut self, port: raw::u8) -> u8 {
         unsafe { input_harness(self, port) }
     }
-    fn output(&mut self, port: u8, value: Wrapping<u8>) {
+    fn output(&mut self, port: raw::u8, value: u8) {
         unsafe { output_harness(self, port, value) }
     }
     #[cfg(feature="open")]
-    fn did_execute(&mut self, client: &crate::State, did: Op) -> Result<Option<Op>, crate::string::String> {
+    fn did_execute(&mut self, client: &crate::State, did: Op) -> Result<Option<Op>, String> {
         use core::{mem::transmute, ffi::CStr};
         unsafe {
             match did_execute_harness(self, client, u32::from_be_bytes(did.into())) {
                 None => Ok(None),
-                Some(code@&[0, ..]) => Ok(Some(Op::extract(code[1..].iter().copied()).or(Err(crate::string::String::from("Not a valid opcode")))?.0)),
+                Some(code@&[Wrapping(0), ..]) => Ok(Some(Op::extract(code[1..].iter().copied()).or(Err(String::from("Not a valid opcode")))?.0)),
                 Some(bytes) => Err(CStr::from_ptr(transmute(bytes)).to_string_lossy().into_owned()),
             }
         }

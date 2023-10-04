@@ -1,20 +1,19 @@
-use core::fmt::UpperHex;
-
-use crate::{bits, num::Wrapping, convert::TryFrom, chip::access::{*, Byte::*, Register::*, Word::*, Double::*, Internal::*}};
+use crate::prelude::{*, convert::TryFrom, fmt::UpperHex};
+use crate::chip::access::{*, Byte::*, Register::*, Word::*, Double::*, Internal::*};
 
 /// A single action on the processor. See the 8080 Programmer's manual for details and operation effects.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Op {
-    NOP(u8),
+    NOP(raw::u8),
     Add{from: Byte, carry: bool},
-    AddTo{value: bits::u8, carry: bool},
+    AddTo{value: u8, carry: bool},
     And{from: Byte},
-    AndWith{value: bits::u8},
-    Call{sub: bits::u16},
-    CallIf(Test, bits::u16),
+    AndWith{value: u8},
+    Call{sub: u16},
+    CallIf(Test, u16),
     CarryFlag(bool),
     Compare{from: Byte},
-    CompareWith{value: bits::u8},
+    CompareWith{value: u8},
     ComplementAccumulator,
     DecimalAddAdjust,
     DecrementByte{register: Byte},
@@ -24,26 +23,26 @@ pub enum Op {
     ExchangeDoubleWithHilo, 
     ExchangeTopWithHilo,
     ExclusiveOr{ from: Byte },
-    ExclusiveOrWith{value: bits::u8},
+    ExclusiveOrWith{value: u8},
     Halt,
-    In(u8),
+    In(raw::u8),
     IncrementByte{register: Byte},
     IncrementWord{register: Internal},
-    Jump{to: bits::u16},
-    JumpIf(Test, bits::u16),
-    LoadAccumulator{address: bits::u16},
+    Jump{to: u16},
+    JumpIf(Test, u16),
+    LoadAccumulator{address: u16},
     LoadAccumulatorIndirect{register: Double},
-    LoadExtendedWith{to: Internal, value: bits::u16 },
-    LoadHilo{address: bits::u16},
+    LoadExtendedWith{to: Internal, value: u16 },
+    LoadHilo{address: u16},
     Move{to: Byte, from: Byte},
-    MoveData{value: bits::u8, to: Byte},
+    MoveData{value: u8, to: Byte},
     Or{from: Byte},
-    OrWith{value: bits::u8},
-    Out(u8),
+    OrWith{value: u8},
+    Out(raw::u8),
     Pop(Word),
     ProgramCounterFromHilo,
     Push(Word),
-    Reset{vector: u8},
+    Reset{vector: raw::u8},
     Return,
     ReturnIf(Test),
     RotateLeftCarrying,
@@ -51,16 +50,15 @@ pub enum Op {
     RotateAccumulatorLeft,
     RotateAccumulatorRight,
     StackPointerFromHilo,
-    StoreAccumulator{address: bits::u16},
+    StoreAccumulator{address: u16},
     StoreAccumulatorIndirect{register: Double},
-    StoreHilo{address: bits::u16},
+    StoreHilo{address: u16},
     Subtract{from: Byte, carry: bool},
-    SubtractBy{value: bits::u8, carry: bool},
+    SubtractBy{value: u8, carry: bool},
 }
-use Op::*;
 
-impl From<u8> for Internal {
-    fn from(value: u8) -> Self {
+impl From<raw::u8> for Internal {
+    fn from(value: raw::u8) -> Self {
         match value & 0b00_11_0000 {
             0b00_00_0000 => Wide(BC),
             0b00_01_0000 => Wide(DE),
@@ -71,18 +69,18 @@ impl From<u8> for Internal {
     }
 }
 
-impl From<Word> for u8 {
+impl From<Word> for raw::u8 {
     fn from(value: Word) -> Self {
         match value {
             Word::ProgramStatus | OnBoard(StackPointer) => 3,
-            OnBoard(Wide(pair)) => pair as u8,
+            OnBoard(Wide(pair)) => pair as raw::u8,
             word => panic!("No bit encoding for location {word:?} in op."),
         }
     }
 }
 
-impl From<u8> for Byte {
-    fn from(value: u8) -> Self {
+impl From<raw::u8> for Byte {
+    fn from(value: raw::u8) -> Self {
         match value & 0b00_111_000 {
             0b00_000_000 => Single(B),
             0b00_001_000 => Single(C),
@@ -97,22 +95,22 @@ impl From<u8> for Byte {
     }
 }
 
-impl From<Byte> for u8 {
+impl From<Byte> for raw::u8 {
     fn from(value: Byte) -> Self {
         match value {
             Byte::Indirect => 6,
             Single(A) => 7,
             #[cfg(target_endian="little")]
-            Single(reg) => reg as u8,
+            Single(reg) => reg as raw::u8,
             #[cfg(target_endian="big")]
-            Single(reg) => reg as u8 ^ 0x01,
+            Single(reg) => reg as raw::u8 ^ 0x01,
             Byte::RAM(_) => panic!("No encoding for direct RAM references"),
         }
     }
 }
 
 impl Byte {
-    fn split(value: u8) -> (Self, Self) {
+    fn split(value: raw::u8) -> (Self, Self) {
         (Self::from(value), Self::from(value << 3))
     }
 }
@@ -151,8 +149,8 @@ impl Test {
     }
 }
 
-impl From<u8> for Test {
-    fn from(value: u8) -> Self {
+impl From<raw::u8> for Test {
+    fn from(value: raw::u8) -> Self {
         let test = match (value & 0b00_11_0_000) >> 4 {
             0b00 => Zero,
             0b01 => Carry,
@@ -168,7 +166,7 @@ impl From<u8> for Test {
     }
 }
 
-impl From<Test> for u8 {
+impl From<Test> for raw::u8 {
     fn from(value: Test) -> Self {
         match value {
             Not(Zero) => 0b00_00_0_000,
@@ -186,6 +184,8 @@ impl From<Test> for u8 {
 #[disclose]
 #[allow(non_upper_case_globals)]
 mod b11111111 {
+    use super::raw::u8;
+
     const NoOp: u8 = 0b00000000;
     const RotateLeftCarrying: u8        = 0b00000111;
     const RotateRightCarrying: u8       = 0b00001111;
@@ -235,6 +235,8 @@ mod b11111111 {
 #[disclose]
 #[allow(non_upper_case_globals)]
 mod b11_00_1111 {
+    use super::raw::u8;
+
     const LoadExtendedImmediate: u8 = 0b00_00_0001;
     const IncrementExtended: u8 = 0b00_00_0011;
     const DecrementExtended: u8 = 0b00_00_1011;
@@ -246,6 +248,8 @@ mod b11_00_1111 {
 #[disclose]
 #[allow(non_upper_case_globals)]
 mod b11_000_111 {
+    use super::raw::u8;
+    
     const IncrementRegister: u8 = 0b00_000_100;
     const DecrementRegister: u8 = 0b00_000_101;
     const JumpIf: u8 = 0b11_000_010;
@@ -258,6 +262,8 @@ mod b11_000_111 {
 #[disclose]
 #[allow(non_upper_case_globals)]
 mod b11_111_000 {
+    use super::raw::u8;
+    
     const AddToAccumulator: u8  = 0b10_000_000;
     const AddCarryingToAccumulator : u8 = 0b10_001_000;
     const SubtractFromAccumulator: u8   = 0b10_010_000;
@@ -271,12 +277,14 @@ mod b11_111_000 {
 #[disclose]
 #[allow(non_upper_case_globals)]
 mod b11_000000 {
-    const Move: u8  = 0b01_000000;
+    const Move: super::raw::u8  = 0b01_000000;
 }
 
 #[disclose]
 #[allow(non_upper_case_globals)]
 mod b111_0_1111 {
+    use super::raw::u8;
+    
     const LoadAccumulatorIndirect: u8   = 0b000_0_1010;
     const StoreAccumulatorIndirect: u8  = 0b000_0_0010;
 }
@@ -326,7 +334,8 @@ impl TryFrom<[u8;1]> for Op {
     type Error = [u8;1];
     fn try_from(value: [u8;1]) -> Result<Self, Self::Error> {
         {
-            let value = value[0];
+            use Op::*;
+            let value = value[0].0;
             let value = match value & 0b11111111 {
                 b11111111::NoOp => return Ok(NOP(4)),
                 b11111111::ExchangeDoubleWithHilo => return Ok(ExchangeDoubleWithHilo),
@@ -397,9 +406,10 @@ impl TryFrom<[u8;1]> for Op {
 impl TryFrom<[u8;2]> for Op {
     type Error = [u8;2];
     fn try_from(code: [u8;2]) -> Result<Self, Self::Error> {
+        use Op::*;
         let [action, value] = code;
-        let value = Wrapping(value);
-        let action = match action {
+        let value = value;
+        let action = match action.0 {
             b11111111::AddImmediate => return Ok(AddTo { value, carry: false }),
             b11111111::AddImmediateCarrying => return Ok(AddTo{ value, carry: true }),
             b11111111::SubtractImmediate => return Ok(SubtractBy{ value, carry: false }),
@@ -408,9 +418,9 @@ impl TryFrom<[u8;2]> for Op {
             b11111111::ExclusiveOrImmediate => return Ok(ExclusiveOrWith{value}),
             b11111111::OrImmediate => return Ok(OrWith{value}),
             b11111111::CompareImmediate => return Ok(CompareWith{ value }),
-            b11111111::Output => return Ok(Out(code[1])),
-            b11111111::Input => return Ok(In(code[1])),
-            _next => action,
+            b11111111::Output => return Ok(Out(code[1].0)),
+            b11111111::Input => return Ok(In(code[1].0)),
+            next => next,
         };
         let _action = match action & 0b11_000_111 {
             b11_000_111::MoveImmediate => return Ok(MoveData{ value, to: Byte::from(action) }),
@@ -423,8 +433,9 @@ impl TryFrom<[u8;2]> for Op {
 impl TryFrom<[u8;3]> for Op {
     type Error = [u8;3];
     fn try_from(value: [u8;3]) -> Result<Self, Self::Error> {
-        let action = value[0];
-        let data = Wrapping(u16::from_le_bytes([value[1], value[2]]));
+        use Op::*;
+        let action = value[0].0;
+        let data = Wrapping(raw::u16::from_le_bytes([value[1].0, value[2].0]));
         match action {
             b11111111::LoadHiloDirect => return Ok(LoadHilo{address: data}),
             b11111111::StoreHiloDirect => return Ok(StoreHilo{address: data}),
@@ -448,7 +459,8 @@ impl TryFrom<[u8;3]> for Op {
 }
 
 impl Op {
-    pub fn len(&self) -> u8 {
+    pub fn len(&self) -> raw::u8 {
+        use Op::*;
         match self {
             Call{..} | CallIf(..) | Jump{..} | JumpIf(..) | LoadExtendedWith{..} | 
             ReturnIf(..) | StoreAccumulator{..} | LoadAccumulator {..} | LoadHilo{..} | StoreHilo {..}
@@ -472,10 +484,10 @@ impl Op {
             Ok(op) => return Ok((op, 1)),
             Err(code) => code,
         };
-        match code[0] {
+        match code[0].0 {
             0xCB | 0xD9 => return Err(Error::Unknown(code[0])),
             0xDD | 0xED | 0xFD => return Err(Error::Unknown(code[0])),
-            nop if nop & 0b11_000_111 == 0 => return Err(Error::Unknown(nop)),
+            nop if nop & 0b11_000_111 == 0 => return Err(Error::Unknown(code[0])),
             _ => ()
         };
         let code = match Op::try_from([code[0], feed.next().ok_or(Error::Invalid(code))?]) {
@@ -489,8 +501,10 @@ impl Op {
     }
 }
 
-impl Into<[u8;4]> for Op {
-    fn into(self) -> [u8;4] {
+impl Into<[raw::u8;4]> for Op {
+    fn into(self) -> [raw::u8;4] {
+        use Op::*;
+        use raw::u8;
         match self {
             NOP(..) => [ 1, 0, 0, 0 ],
             Add{ from, .. } | Subtract { from, .. } | And { from } | 
@@ -507,7 +521,7 @@ impl Into<[u8;4]> for Op {
                         Compare { .. } => b11_111_000::CompareWithAccumulator,
                         _ => unreachable!(),
                     };
-                    [ 1, op | u8::from(from), 0, 0 ]
+                    [ 1, op | raw::u8::from(from), 0, 0 ]
                 }
             AddTo { value, .. } | SubtractBy { value, .. } | AndWith { value } |
             ExclusiveOrWith { value } | OrWith { value } | CompareWith { value }
@@ -550,7 +564,7 @@ impl Into<[u8;4]> for Op {
                 => { let bytes = value.0.to_le_bytes(); [ 3, b11_00_1111::LoadExtendedImmediate | (u8::from(OnBoard(to)) << 4), bytes[0], bytes[1] ] }
             LoadHilo { address } 
                 => { let bytes = address.0.to_le_bytes(); [3, b11111111::LoadHiloDirect, bytes[0], bytes[1] ] }
-            Move { to, from } => [ 1, b11_000000::Move | (u8::from(to) << 3) | u8::from(from), 0, 0 ],
+            Move { to, from } => [ 1, b11_000000::Move | (u8::from(to) << 3) | raw::u8::from(from), 0, 0 ],
             MoveData { value, to } => [ 2, b11_000_111::MoveImmediate | (u8::from(to) << 3), value.0, 0 ],
             Out(port) => [ 2, b11111111::Output, port, 0 ],
             Pop(target) => [ 1, b11_00_1111::Pop | (u8::from(target) << 4), 0, 0 ],

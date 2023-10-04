@@ -1,18 +1,13 @@
-pub use execution::opcode;
+use crate::prelude::*;
 
-use core::{borrow::BorrowMut, num::Wrapping};
-use crate::{Harness, Machine, bits::*};
-
-#[cfg(not(any(doc, feature="open")))]
-pub(self) mod access;
-#[cfg(any(doc, feature="open"))]
-pub mod access;
-
+#[cfg_attr(feature="open", disclose)]
+mod access;
 mod execution;
+pub use execution::opcode;
 
 /// This struct stores the internal registers and flags of the 8080 CPU.
 #[repr(C)]
-#[disclose(crate)]
+#[cfg_attr(feature="open", disclose)]
 pub struct State {
 	pc: u16,
 	sp: u16,
@@ -20,8 +15,6 @@ pub struct State {
 	c: bool, a: bool, p: bool, m: bool, z: bool,
 	active: bool, interrupts: bool,
 }
-
-//pub use access::Byte;
 
 impl State {
 	/// Creates a fresh state with the processor in an active state and all registers reset.
@@ -37,7 +30,7 @@ impl State {
 
 #[cfg(feature="open")]
 impl<H: Harness + ?Sized, C: BorrowMut<H>> Iterator for Machine<H, C> {
-	type Item = Result<core::primitive::u8, crate::string::String>;
+	type Item = Result<raw::u8, String>;
 	fn next(&mut self) -> Option<Self::Item> {
 		let result = self.execute();
 		match result {
