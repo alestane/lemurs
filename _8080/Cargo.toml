@@ -1,6 +1,6 @@
 [package]
 name = "lemurs-8080"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 authors = ["Nevin Flanagan"]
 description = "An emulator for the Intel 8080 microprocessor"
