@@ -1,5 +1,4 @@
-use lemurs_8080::{Harness, op};
-use core::{ops::{Deref, Index, IndexMut}, num::Wrapping};
+use lemurs_8080::{prelude::*, Op};
 use std::collections::HashSet;
 
 #[allow(non_camel_case_types)]
@@ -53,8 +52,8 @@ impl Harness for CP_M {
     fn write(&mut self, to: Wrapping<u16>, value: Wrapping<u8>) { if (0x100..).contains(&to.0) { self.ram[to.0 as usize] = value.0; } }
     fn input(&mut self, port: u8) -> Wrapping<u8> { Wrapping(self.port[port as usize]) }
     fn output(&mut self, port: u8, value: Wrapping<u8>) { self.port[port as usize] = value.0; }
-    fn did_execute(&mut self, client: &lemurs_8080::State, _did: op::Op) -> Result<Option<op::Op>, String> {
-        use lemurs_8080::support::{Double, Register};
+    fn did_execute(&mut self, client: &lemurs_8080::State, _did: Op) -> Result<Option<Op>, String> {
+        use lemurs_8080::{Double, Register};
         self.order.push(client.pc);
         if client.pc.0 >= 0x01AB && self.history.contains(&client.pc) {
             eprintln!("\n{:?}", self.order);
@@ -65,7 +64,7 @@ impl Harness for CP_M {
         match client.pc.0 {
             0 => {
                 print!("\n");
-                return (self.dead == 0).then_some(Some(op::Halt)).ok_or(String::from("Failed tests"));
+                return (self.dead == 0).then_some(Some(Op::Halt)).ok_or(String::from("Failed tests"));
             }
             5 => { 
                 let offset = client[Double::DE].0;
@@ -79,9 +78,9 @@ impl Harness for CP_M {
                             };
                         };
                     }
-                    _ => (),
+                    _ => (), 
                 };
-                return Ok(Some(op::Return));
+                return Ok(Some(Op::Return));
             }
             0x0689 => {
                 let from = u16::from_le_bytes([self[client.sp.0], self[client.sp.0 + 1]]) - 3;
