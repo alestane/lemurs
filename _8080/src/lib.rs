@@ -71,16 +71,7 @@ mod bits {
 }
 
 #[cfg(any(feature="open", doc))]
-mod internal {
-    use super::*;
-    pub use chip::State;
-    pub use chip::access::*;
-    pub use crate::chip::opcode as op;
-    pub use crate::chip::opcode::{Op::{self, *}, Flag::*, Test::*};
-}
-
-#[cfg(any(feature="open", doc))]
-pub use internal::*;
+pub use crate::chip::{State, access::*, opcode::{self as op, Op::{self, *}, Flag::*, Test::*}};
 
 /// The Harness trait is the core of using this package; the `Machine` struct will use a
 /// type of your choosing that the chip can use to read 8-bit or 16-bit values from 16-bit

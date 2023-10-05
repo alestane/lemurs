@@ -1,7 +1,6 @@
 use crate::prelude::*;
 
-#[cfg_attr(feature="open", disclose)]
-mod access;
+pub mod access;
 mod execution;
 pub use execution::opcode;
 

@@ -1,7 +1,7 @@
-use super::*;    
+use super::{*, Op::*};    
     
-fn decode(value: &[u8]) -> Result<(Op, usize), self::Error> {
-    Op::extract(value.iter().copied())
+fn decode(value: &[raw::u8]) -> Result<(Op, usize), self::Error> {
+    Op::extract(value.iter().copied().map(|v| Wrapping(v)))
 }
 
 #[test]
@@ -95,7 +95,7 @@ fn transfer() {
     let op = decode(&[0x31, 0x25, 0x02]).unwrap();
     assert_eq!(op.0, LoadExtendedWith { to: StackPointer, value: Wrapping(549) });
     let fail = decode(&[0x11, 0x21]).unwrap_err();
-    assert_eq!(fail, Error::InvalidPair([0x11, 0x21]));
+    assert_eq!(fail, Error::InvalidPair([Wrapping(0x11), Wrapping(0x21)]));
     let op = decode(&[0x32, 0x67, 0x9A]).unwrap();
     assert_eq!(op.0, StoreAccumulator { address: Wrapping(0x9A67) });
     let op = decode(&[0x3A, 0x31, 0xE7]).unwrap();
@@ -103,7 +103,7 @@ fn transfer() {
     let op = decode(&[0x2A, 0x5B, 0x73]).unwrap();
     assert_eq!(op.0, LoadHilo{address: Wrapping(0x735B)});
     let op = decode(&[0x2A]).unwrap_err();
-    assert_eq!(op, Error::Invalid([0x2A]));
+    assert_eq!(op, Error::Invalid([Wrapping(0x2A)]));
     let op = decode(&[0x22, 0x03, 0x01]).unwrap();
     assert_eq!(op.0, StoreHilo{address: Wrapping(0x0103)});
     let op = decode(&[0x1A]).unwrap();
@@ -131,7 +131,7 @@ fn jump() {
     let op = decode(&[0xF2, 0x31, 0x4A]).unwrap();
     assert_eq!(op.0, JumpIf(Not(Negative), Wrapping(0x4A31)));
     let fail = decode(&[0xFA]).unwrap_err();
-    assert_eq!(fail, Error::Invalid([0xFA]));
+    assert_eq!(fail, Error::Invalid([Wrapping(0xFA)]));
 }
 
 #[test]
@@ -141,7 +141,7 @@ fn call() {
     let op = decode(&[0xE4, 0x4B, 0x03]).unwrap();
     assert_eq!(op.0, CallIf(Not(EvenParity), Wrapping(0x034B)));
     let fail = decode(&[0xD2, 0x07]).unwrap_err();
-    assert_eq!(fail, Error::InvalidPair([0xD2, 0x07]));
+    assert_eq!(fail, Error::InvalidPair([Wrapping(0xD2), Wrapping(0x07)]));
 }
 
 #[test]
@@ -149,7 +149,7 @@ fn add() {
     let op = decode(&[0xC6, 0x39, 0x02]).unwrap();
     assert_eq!(op.0, AddTo { value: Wrapping(0x39), carry: false });
     let fail = decode(&[0xC6]).unwrap_err();
-    assert_eq!(fail, Error::Invalid([0xC6]));
+    assert_eq!(fail, Error::Invalid([Wrapping(0xC6)]));
     let op = decode(&[0xCE, 0x72]).unwrap();
     assert_eq!(op.0, AddTo{value: Wrapping(0x72), carry: true});
     let op = decode(&[0x84, 0x87]).unwrap();
@@ -193,7 +193,7 @@ fn move_i() {
     assert_eq!(op.1, 2);
     assert_eq!(op.0, MoveData { value: Wrapping(0x09), to: Single(C) });
     let fail = decode(&[0x26]).unwrap_err();
-    assert_eq!(fail, Error::Invalid([0x26]));
+    assert_eq!(fail, Error::Invalid([Wrapping(0x26)]));
 }
 
 #[test]
@@ -214,7 +214,7 @@ fn compare() {
     assert_eq!(op.1, 2);
     assert_eq!(op.0, CompareWith{value: Wrapping(0x2B)});
     let fail = decode(&[0xFE]).unwrap_err();
-    assert_eq!(fail, Error::Invalid([0xFE]));
+    assert_eq!(fail, Error::Invalid([Wrapping(0xFE)]));
     let op = decode(&[0xBF]).unwrap();
     assert_eq!(op.0, Compare{from: Single(A)});
 }
