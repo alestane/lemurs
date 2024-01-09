@@ -6,6 +6,7 @@ authors = ["Nevin Flanagan"]
 description = "An emulator for the Intel 8080 microprocessor"
 readme = "README.md"
 license = "UPL-1.0"
+repository = "https://github.com/alestane/lemurs.git"
 
 [lib]
 crate-type = ["rlib", "staticlib"]
