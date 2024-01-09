@@ -6,6 +6,7 @@ authors = ["Nevin Flanagan"]
 description = "An emulator for the Intel 8080 microprocessor"
 readme = "README.md"
 license = "UPL-1.0"
+repository = "544b8d674d3a4b55cae07e12bdf4a1304bbe2878"
 
 [lib]
 crate-type = ["rlib", "staticlib"]
